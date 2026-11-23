@@ -1,0 +1,533 @@
+{
+  "openapi": "3.0.3",
+  "info": {"title":"Fashion Store MVP A API","version":"1.0.0","description":"Contract thiết kế đã nghiệm thu ở M1-08, chưa có backend chạy. Q03 giỏ Guest còn mở; API giỏ hiện dành cho Customer đăng nhập. Không gồm Staff, sandbox hoặc AI."},
+  "servers": [{"url":"/api/v1","description":"Web cùng origin; Android cấu hình HTTPS API origin khi triển khai."}],
+  "paths": {
+    "/auth/register": {
+      "post": {
+        "tags": ["Auth"],
+        "operationId": "registerCustomer",
+        "description": "Đăng ký công khai chỉ tạo Customer. Web bắt buộc Origin khớp; native gửi JSON, không gửi Origin. Đăng ký không cấp phiên.",
+        "security": [],
+        "requestBody": {"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/Credentials"}}}},
+        "responses": {"201":{"description":"Thành công","content":{"application/json":{"schema":{"$ref":"#/components/schemas/User"}}}},"400":{"description":"VALIDATION_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"403":{"description":"INVALID_ORIGIN","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"409":{"description":"EMAIL_ALREADY_EXISTS","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"429":{"description":"RATE_LIMITED","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"500":{"description":"INTERNAL_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}}}
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "tags": ["Auth"],
+        "operationId": "loginAndroid",
+        "description": "Chỉ Customer Android. Endpoint native từ chối request có Origin của trình duyệt. Token mẫu là opaque, không phải JWT.",
+        "security": [],
+        "requestBody": {"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/Credentials"},"example":{"email":"customer@example.test","password":"demo-example-only"}}}},
+        "responses": {"200":{"description":"Thành công","content":{"application/json":{"schema":{"$ref":"#/components/schemas/NativeSession"},"example":{"user":{"id":"42","email":"customer@example.test","role":"CUSTOMER","status":"ACTIVE"},"token":"example-opaque-token","expiresAt":"2026-11-27T10:00:00Z"}}},"headers":{"Cache-Control":{"schema":{"type":"string","enum":["no-store"]}}}},"400":{"description":"VALIDATION_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"401":{"description":"UNAUTHENTICATED / INVALID_CREDENTIALS","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"403":{"description":"INVALID_ORIGIN / FORBIDDEN","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"429":{"description":"RATE_LIMITED","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"500":{"description":"INTERNAL_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}}}
+      }
+    },
+    "/auth/web/login": {
+      "post": {
+        "tags": ["Auth"],
+        "operationId": "loginWeb",
+        "description": "Web cùng origin, bắt buộc kiểm tra Origin. Customer hoặc Admin Web; trả cookie và CSRF token. Cookie phiên không nằm trong JSON.",
+        "security": [],
+        "requestBody": {"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/Credentials"}}}},
+        "responses": {"200":{"description":"Thành công","content":{"application/json":{"schema":{"$ref":"#/components/schemas/WebSession"}}},"headers":{"Set-Cookie":{"description":"Host-only; Secure; HttpOnly; SameSite=Lax; Path=/","schema":{"type":"string"}},"Cache-Control":{"schema":{"type":"string","enum":["no-store"]}}}},"400":{"description":"VALIDATION_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"401":{"description":"UNAUTHENTICATED / INVALID_CREDENTIALS","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"403":{"description":"INVALID_ORIGIN / FORBIDDEN","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"429":{"description":"RATE_LIMITED","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"500":{"description":"INTERNAL_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}}}
+      }
+    },
+    "/auth/csrf": {
+      "get": {
+        "tags": ["Auth"],
+        "operationId": "readWebCsrf",
+        "description": "Dành cho khởi động lại Web. Đọc token ràng buộc với phiên, không xoay phiên; trả Cache-Control: no-store. Yêu cầu cùng origin, không cấp quyền cross-origin.",
+        "security": [{"WebSession":[]}],
+        "responses": {"200":{"description":"Thành công","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Csrf"}}},"headers":{"Cache-Control":{"schema":{"type":"string","enum":["no-store"]}}}},"401":{"description":"UNAUTHENTICATED / INVALID_CREDENTIALS","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"403":{"description":"INVALID_ORIGIN","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"500":{"description":"INTERNAL_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}}}
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "tags": ["Auth"],
+        "operationId": "logout",
+        "description": "Thu hồi phiên hiện tại và xóa cookie nếu dùng Web.",
+        "security": [{"AndroidBearer":[]},{"WebSession":[],"WebCsrf":[]}],
+        "responses": {"204":{"description":"Thành công","headers":{"Set-Cookie":{"description":"Chỉ với Web: xóa cookie __Host-session.","schema":{"type":"string"}}}},"401":{"description":"UNAUTHENTICATED / INVALID_CREDENTIALS","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"403":{"description":"FORBIDDEN / CSRF_INVALID","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"500":{"description":"INTERNAL_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}}}
+      }
+    },
+    "/me": {
+      "get": {
+        "tags": ["Auth"],
+        "operationId": "getMe",
+        "description": "",
+        "security": [{"AndroidBearer":[]},{"WebSession":[]}],
+        "responses": {"200":{"description":"Thành công","content":{"application/json":{"schema":{"$ref":"#/components/schemas/User"}}}},"401":{"description":"UNAUTHENTICATED / INVALID_CREDENTIALS","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"500":{"description":"INTERNAL_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}}}
+      }
+    },
+    "/me/addresses": {
+      "get": {
+        "tags": ["Auth"],
+        "operationId": "listAddresses",
+        "description": "Customer, kiểm tra ownership. ",
+        "security": [{"AndroidBearer":[]},{"WebSession":[]}],
+        "responses": {"200":{"description":"Thành công","content":{"application/json":{"schema":{"type":"array","items":{"$ref":"#/components/schemas/Address"}}}}},"401":{"description":"UNAUTHENTICATED / INVALID_CREDENTIALS","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"403":{"description":"FORBIDDEN / CSRF_INVALID","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"500":{"description":"INTERNAL_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}}}
+      },
+      "post": {
+        "tags": ["Auth"],
+        "operationId": "createAddress",
+        "description": "Customer, kiểm tra ownership. ",
+        "security": [{"AndroidBearer":[]},{"WebSession":[],"WebCsrf":[]}],
+        "requestBody": {"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/AddressInput"}}}},
+        "responses": {"201":{"description":"Thành công","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Address"}}}},"400":{"description":"VALIDATION_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"401":{"description":"UNAUTHENTICATED / INVALID_CREDENTIALS","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"403":{"description":"FORBIDDEN / CSRF_INVALID","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"500":{"description":"INTERNAL_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}}}
+      }
+    },
+    "/me/addresses/{addressId}": {
+      "patch": {
+        "tags": ["Auth"],
+        "operationId": "updateAddress",
+        "description": "Customer, kiểm tra ownership. ",
+        "security": [{"AndroidBearer":[]},{"WebSession":[],"WebCsrf":[]}],
+        "parameters": [{"name":"addressId","in":"path","required":true,"schema":{"type":"string","pattern":"^[1-9][0-9]*$"}}],
+        "requestBody": {"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/AddressPatch"}}}},
+        "responses": {"200":{"description":"Thành công","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Address"}}}},"400":{"description":"VALIDATION_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"401":{"description":"UNAUTHENTICATED / INVALID_CREDENTIALS","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"403":{"description":"FORBIDDEN / CSRF_INVALID","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"404":{"description":"NOT_FOUND. Dùng cùng phản hồi khi tài nguyên không thuộc Customer.","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"500":{"description":"INTERNAL_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}}}
+      }
+    },
+    "/categories": {
+      "get": {
+        "tags": ["Catalog"],
+        "operationId": "listCategories",
+        "description": "Chỉ trả danh mục ACTIVE.",
+        "security": [],
+        "responses": {"200":{"description":"Thành công","content":{"application/json":{"schema":{"type":"array","items":{"$ref":"#/components/schemas/Category"}}}}},"500":{"description":"INTERNAL_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}}}
+      }
+    },
+    "/products": {
+      "get": {
+        "tags": ["Catalog"],
+        "operationId": "listProducts",
+        "description": "Chỉ product/variant ACTIVE. Sort giá theo giá thấp nhất của biến thể khớp bộ lọc; phá hòa bằng ID. NEWEST sắp theo thời điểm tạo giảm dần rồi ID giảm dần.",
+        "security": [],
+        "parameters": [{"name":"page","in":"query","required":false,"schema":{"type":"integer","minimum":1,"default":1}},{"name":"pageSize","in":"query","required":false,"schema":{"type":"integer","minimum":1,"maximum":100,"default":20}},{"name":"q","in":"query","required":false,"schema":{"type":"string","minLength":1}},{"name":"categoryId","in":"query","required":false,"schema":{"type":"string","pattern":"^[1-9][0-9]*$"}},{"name":"size","in":"query","required":false,"schema":{"type":"string","minLength":1}},{"name":"color","in":"query","required":false,"schema":{"type":"string","minLength":1}},{"name":"sort","in":"query","required":false,"schema":{"type":"string","enum":["NEWEST","PRICE_ASC","PRICE_DESC"]}}],
+        "responses": {"200":{"description":"Thành công","content":{"application/json":{"schema":{"$ref":"#/components/schemas/ProductPage"}}}},"400":{"description":"VALIDATION_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"500":{"description":"INTERNAL_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}}}
+      }
+    },
+    "/products/{productId}": {
+      "get": {
+        "tags": ["Catalog"],
+        "operationId": "getProduct",
+        "description": "Chỉ product và biến thể ACTIVE.",
+        "security": [],
+        "parameters": [{"name":"productId","in":"path","required":true,"schema":{"type":"string","pattern":"^[1-9][0-9]*$"}}],
+        "responses": {"200":{"description":"Thành công","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Product"}}}},"404":{"description":"NOT_FOUND","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"500":{"description":"INTERNAL_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}}}
+      }
+    },
+    "/products/{productId}/reviews": {
+      "get": {
+        "tags": ["Catalog"],
+        "operationId": "listProductReviews",
+        "description": "Chỉ review VISIBLE của sản phẩm công khai. Sắp theo createdAt và ID giảm dần.",
+        "security": [],
+        "parameters": [{"name":"productId","in":"path","required":true,"schema":{"type":"string","pattern":"^[1-9][0-9]*$"}},{"name":"page","in":"query","required":false,"schema":{"type":"integer","minimum":1,"default":1}},{"name":"pageSize","in":"query","required":false,"schema":{"type":"integer","minimum":1,"maximum":100,"default":20}}],
+        "responses": {"200":{"description":"Thành công","content":{"application/json":{"schema":{"$ref":"#/components/schemas/ReviewPage"}}}},"400":{"description":"VALIDATION_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"404":{"description":"NOT_FOUND","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"500":{"description":"INTERNAL_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}}}
+      }
+    },
+    "/cart": {
+      "get": {
+        "tags": ["Cart"],
+        "operationId": "getCart",
+        "description": "Customer, kiểm tra ownership. ",
+        "security": [{"AndroidBearer":[]},{"WebSession":[]}],
+        "responses": {"200":{"description":"Thành công","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Cart"}}}},"401":{"description":"UNAUTHENTICATED / INVALID_CREDENTIALS","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"403":{"description":"FORBIDDEN / CSRF_INVALID","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"500":{"description":"INTERNAL_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}}}
+      }
+    },
+    "/cart/items": {
+      "post": {
+        "tags": ["Cart"],
+        "operationId": "addCartItem",
+        "description": "Customer, kiểm tra ownership. Cộng số lượng của SKU. Server kiểm tra tồn và giá; 409 khi vượt tồn.",
+        "security": [{"AndroidBearer":[]},{"WebSession":[],"WebCsrf":[]}],
+        "requestBody": {"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/CartLine"}}}},
+        "responses": {"200":{"description":"Thành công","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Cart"}}}},"400":{"description":"VALIDATION_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"401":{"description":"UNAUTHENTICATED / INVALID_CREDENTIALS","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"403":{"description":"FORBIDDEN / CSRF_INVALID","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"409":{"description":"OUT_OF_STOCK","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"500":{"description":"INTERNAL_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}}}
+      }
+    },
+    "/cart/items/{variantId}": {
+      "patch": {
+        "tags": ["Cart"],
+        "operationId": "setCartItemQuantity",
+        "description": "Customer, kiểm tra ownership. Đặt số lượng tuyệt đối.",
+        "security": [{"AndroidBearer":[]},{"WebSession":[],"WebCsrf":[]}],
+        "parameters": [{"name":"variantId","in":"path","required":true,"schema":{"type":"string","pattern":"^[1-9][0-9]*$"}}],
+        "requestBody": {"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/Quantity"}}}},
+        "responses": {"200":{"description":"Thành công","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Cart"}}}},"400":{"description":"VALIDATION_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"401":{"description":"UNAUTHENTICATED / INVALID_CREDENTIALS","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"403":{"description":"FORBIDDEN / CSRF_INVALID","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"404":{"description":"NOT_FOUND. Dùng cùng phản hồi khi tài nguyên không thuộc Customer.","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"409":{"description":"OUT_OF_STOCK","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"500":{"description":"INTERNAL_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}}}
+      },
+      "delete": {
+        "tags": ["Cart"],
+        "operationId": "removeCartItem",
+        "description": "Customer, kiểm tra ownership. ",
+        "security": [{"AndroidBearer":[]},{"WebSession":[],"WebCsrf":[]}],
+        "parameters": [{"name":"variantId","in":"path","required":true,"schema":{"type":"string","pattern":"^[1-9][0-9]*$"}}],
+        "responses": {"204":{"description":"Thành công"},"401":{"description":"UNAUTHENTICATED / INVALID_CREDENTIALS","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"403":{"description":"FORBIDDEN / CSRF_INVALID","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"404":{"description":"NOT_FOUND. Dùng cùng phản hồi khi tài nguyên không thuộc Customer.","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"500":{"description":"INTERNAL_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}}}
+      }
+    },
+    "/orders": {
+      "post": {
+        "tags": ["Orders"],
+        "operationId": "checkoutCod",
+        "description": "Customer, kiểm tra ownership. Xác minh địa chỉ, đối chiếu ý định mua với giỏ và tính giá server. Fingerprint từ địa chỉ, COD, biến thể/số lượng. Replay tra đơn trước khi đối chiếu giỏ.",
+        "security": [{"AndroidBearer":[]},{"WebSession":[],"WebCsrf":[]}],
+        "parameters": [{"name":"Idempotency-Key","in":"header","required":true,"schema":{"type":"string","minLength":1,"maxLength":128},"description":"Giữ nguyên key và đầu vào khi retry cùng checkout."}],
+        "requestBody": {"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/Checkout"},"example":{"addressId":"12","method":"COD","items":[{"variantId":"15","quantity":1}]}}}},
+        "responses": {"200":{"description":"Replay cùng Customer, key và fingerprint. Trả lại đơn đã commit.","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Order"},"example":{"id":"81","status":"PENDING","paymentStatus":"UNPAID","subtotal":"199000.00","shippingFee":"0.00","total":"199000.00","address":{"name":"Khách Demo","phone":"0900000000","addressText":"Địa chỉ demo"},"items":[{"id":"82","variantId":"15","sku":"TEE-M","name":"Áo demo","size":"M","color":"Đen","quantity":1,"unitPrice":"199000.00","lineTotal":"199000.00"}],"createdAt":"2026-11-20T10:00:00Z"}}}},"201":{"description":"Thành công","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Order"},"example":{"id":"81","status":"PENDING","paymentStatus":"UNPAID","subtotal":"199000.00","shippingFee":"0.00","total":"199000.00","address":{"name":"Khách Demo","phone":"0900000000","addressText":"Địa chỉ demo"},"items":[{"id":"82","variantId":"15","sku":"TEE-M","name":"Áo demo","size":"M","color":"Đen","quantity":1,"unitPrice":"199000.00","lineTotal":"199000.00"}],"createdAt":"2026-11-20T10:00:00Z"}}}},"400":{"description":"VALIDATION_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"401":{"description":"UNAUTHENTICATED / INVALID_CREDENTIALS","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"403":{"description":"FORBIDDEN / CSRF_INVALID","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"404":{"description":"NOT_FOUND. Dùng cùng phản hồi khi tài nguyên không thuộc Customer.","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"409":{"description":"IDEMPOTENCY_CONFLICT / CART_CHANGED / OUT_OF_STOCK","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"500":{"description":"INTERNAL_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}}}
+      }
+    },
+    "/orders/me": {
+      "get": {
+        "tags": ["Orders"],
+        "operationId": "listMyOrders",
+        "description": "Customer, kiểm tra ownership.  Sắp theo createdAt và ID giảm dần.",
+        "security": [{"AndroidBearer":[]},{"WebSession":[]}],
+        "parameters": [{"name":"page","in":"query","required":false,"schema":{"type":"integer","minimum":1,"default":1}},{"name":"pageSize","in":"query","required":false,"schema":{"type":"integer","minimum":1,"maximum":100,"default":20}}],
+        "responses": {"200":{"description":"Thành công","content":{"application/json":{"schema":{"$ref":"#/components/schemas/OrderPage"}}}},"400":{"description":"VALIDATION_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"401":{"description":"UNAUTHENTICATED / INVALID_CREDENTIALS","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"403":{"description":"FORBIDDEN / CSRF_INVALID","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"500":{"description":"INTERNAL_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}}}
+      }
+    },
+    "/orders/{orderId}": {
+      "get": {
+        "tags": ["Orders"],
+        "operationId": "getMyOrder",
+        "description": "Customer, kiểm tra ownership. ",
+        "security": [{"AndroidBearer":[]},{"WebSession":[]}],
+        "parameters": [{"name":"orderId","in":"path","required":true,"schema":{"type":"string","pattern":"^[1-9][0-9]*$"}}],
+        "responses": {"200":{"description":"Thành công","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Order"}}}},"401":{"description":"UNAUTHENTICATED / INVALID_CREDENTIALS","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"403":{"description":"FORBIDDEN / CSRF_INVALID","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"404":{"description":"NOT_FOUND. Dùng cùng phản hồi khi tài nguyên không thuộc Customer.","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"500":{"description":"INTERNAL_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}}}
+      }
+    },
+    "/orders/{orderId}/cancel": {
+      "post": {
+        "tags": ["Orders"],
+        "operationId": "cancelMyOrder",
+        "description": "Customer, kiểm tra ownership. Chỉ PENDING; gửi lại với đơn đã CANCELLED trả trạng thái hiện tại, tồn giữ nguyên.",
+        "security": [{"AndroidBearer":[]},{"WebSession":[],"WebCsrf":[]}],
+        "parameters": [{"name":"orderId","in":"path","required":true,"schema":{"type":"string","pattern":"^[1-9][0-9]*$"}}],
+        "responses": {"200":{"description":"Thành công","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Order"}}}},"401":{"description":"UNAUTHENTICATED / INVALID_CREDENTIALS","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"403":{"description":"FORBIDDEN / CSRF_INVALID","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"404":{"description":"NOT_FOUND. Dùng cùng phản hồi khi tài nguyên không thuộc Customer.","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"409":{"description":"INVALID_ORDER_STATE","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"500":{"description":"INTERNAL_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}}}
+      }
+    },
+    "/reviews": {
+      "post": {
+        "tags": ["Reviews"],
+        "operationId": "createReview",
+        "description": "Customer, kiểm tra ownership. Backend suy ra sản phẩm từ dòng hàng thuộc Customer trong đơn DELIVERED. Đánh giá đã ẩn vẫn chiếm lượt. Dòng hàng không thuộc Customer trả 404.",
+        "security": [{"AndroidBearer":[]},{"WebSession":[],"WebCsrf":[]}],
+        "requestBody": {"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/ReviewInput"}}}},
+        "responses": {"201":{"description":"Thành công","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Review"}}}},"400":{"description":"VALIDATION_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"401":{"description":"UNAUTHENTICATED / INVALID_CREDENTIALS","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"403":{"description":"FORBIDDEN / CSRF_INVALID","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"404":{"description":"NOT_FOUND. Dùng cùng phản hồi khi tài nguyên không thuộc Customer.","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"409":{"description":"REVIEW_ALREADY_EXISTS / REVIEW_NOT_ELIGIBLE","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"500":{"description":"INTERNAL_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}}}
+      }
+    },
+    "/admin/categories": {
+      "get": {
+        "tags": ["Admin"],
+        "operationId": "listAdminCategorys",
+        "description": "Admin Web. ",
+        "security": [{"WebSession":[]}],
+        "responses": {"200":{"description":"Thành công","content":{"application/json":{"schema":{"type":"array","items":{"$ref":"#/components/schemas/Category"}}}}},"401":{"description":"UNAUTHENTICATED / INVALID_CREDENTIALS","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"403":{"description":"FORBIDDEN / CSRF_INVALID","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"500":{"description":"INTERNAL_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}}}
+      },
+      "post": {
+        "tags": ["Admin"],
+        "operationId": "createAdminCategory",
+        "description": "Admin Web. ",
+        "security": [{"WebSession":[],"WebCsrf":[]}],
+        "requestBody": {"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/CategoryInput"}}}},
+        "responses": {"201":{"description":"Thành công","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Category"}}}},"400":{"description":"VALIDATION_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"401":{"description":"UNAUTHENTICATED / INVALID_CREDENTIALS","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"403":{"description":"FORBIDDEN / CSRF_INVALID","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"409":{"description":"RESOURCE_CONFLICT","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"500":{"description":"INTERNAL_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}}}
+      }
+    },
+    "/admin/categories/{categoryId}": {
+      "patch": {
+        "tags": ["Admin"],
+        "operationId": "updateAdminCategory",
+        "description": "Admin Web. Chỉ gửi trường cần cập nhật.",
+        "security": [{"WebSession":[],"WebCsrf":[]}],
+        "parameters": [{"name":"categoryId","in":"path","required":true,"schema":{"type":"string","pattern":"^[1-9][0-9]*$"}}],
+        "requestBody": {"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/CategoryPatch"}}}},
+        "responses": {"200":{"description":"Thành công","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Category"}}}},"400":{"description":"VALIDATION_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"401":{"description":"UNAUTHENTICATED / INVALID_CREDENTIALS","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"403":{"description":"FORBIDDEN / CSRF_INVALID","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"404":{"description":"NOT_FOUND","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"409":{"description":"RESOURCE_CONFLICT","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"500":{"description":"INTERNAL_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}}}
+      },
+      "delete": {
+        "tags": ["Admin"],
+        "operationId": "removeAdminCategory",
+        "description": "Admin Web. Từ chối nếu FK còn tham chiếu; dùng trạng thái INACTIVE khi tài nguyên cần giữ cho lịch sử.",
+        "security": [{"WebSession":[],"WebCsrf":[]}],
+        "parameters": [{"name":"categoryId","in":"path","required":true,"schema":{"type":"string","pattern":"^[1-9][0-9]*$"}}],
+        "responses": {"204":{"description":"Thành công"},"401":{"description":"UNAUTHENTICATED / INVALID_CREDENTIALS","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"403":{"description":"FORBIDDEN / CSRF_INVALID","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"404":{"description":"NOT_FOUND","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"409":{"description":"RESOURCE_CONFLICT","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"500":{"description":"INTERNAL_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}}}
+      }
+    },
+    "/admin/products": {
+      "get": {
+        "tags": ["Admin"],
+        "operationId": "listAdminProducts",
+        "description": "Admin Web. ",
+        "security": [{"WebSession":[]}],
+        "parameters": [{"name":"page","in":"query","required":false,"schema":{"type":"integer","minimum":1,"default":1}},{"name":"pageSize","in":"query","required":false,"schema":{"type":"integer","minimum":1,"maximum":100,"default":20}}],
+        "responses": {"200":{"description":"Thành công","content":{"application/json":{"schema":{"$ref":"#/components/schemas/ProductPage"}}}},"400":{"description":"VALIDATION_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"401":{"description":"UNAUTHENTICATED / INVALID_CREDENTIALS","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"403":{"description":"FORBIDDEN / CSRF_INVALID","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"500":{"description":"INTERNAL_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}}}
+      },
+      "post": {
+        "tags": ["Admin"],
+        "operationId": "createAdminProduct",
+        "description": "Admin Web. ",
+        "security": [{"WebSession":[],"WebCsrf":[]}],
+        "requestBody": {"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/ProductInput"}}}},
+        "responses": {"201":{"description":"Thành công","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Product"}}}},"400":{"description":"VALIDATION_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"401":{"description":"UNAUTHENTICATED / INVALID_CREDENTIALS","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"403":{"description":"FORBIDDEN / CSRF_INVALID","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"409":{"description":"RESOURCE_CONFLICT","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"500":{"description":"INTERNAL_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}}}
+      }
+    },
+    "/admin/products/{productId}": {
+      "patch": {
+        "tags": ["Admin"],
+        "operationId": "updateAdminProduct",
+        "description": "Admin Web. Chỉ gửi trường cần cập nhật.",
+        "security": [{"WebSession":[],"WebCsrf":[]}],
+        "parameters": [{"name":"productId","in":"path","required":true,"schema":{"type":"string","pattern":"^[1-9][0-9]*$"}}],
+        "requestBody": {"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/ProductPatch"}}}},
+        "responses": {"200":{"description":"Thành công","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Product"}}}},"400":{"description":"VALIDATION_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"401":{"description":"UNAUTHENTICATED / INVALID_CREDENTIALS","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"403":{"description":"FORBIDDEN / CSRF_INVALID","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"404":{"description":"NOT_FOUND","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"409":{"description":"RESOURCE_CONFLICT","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"500":{"description":"INTERNAL_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}}}
+      },
+      "delete": {
+        "tags": ["Admin"],
+        "operationId": "removeAdminProduct",
+        "description": "Admin Web. Từ chối nếu FK còn tham chiếu; dùng trạng thái INACTIVE khi tài nguyên cần giữ cho lịch sử.",
+        "security": [{"WebSession":[],"WebCsrf":[]}],
+        "parameters": [{"name":"productId","in":"path","required":true,"schema":{"type":"string","pattern":"^[1-9][0-9]*$"}}],
+        "responses": {"204":{"description":"Thành công"},"401":{"description":"UNAUTHENTICATED / INVALID_CREDENTIALS","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"403":{"description":"FORBIDDEN / CSRF_INVALID","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"404":{"description":"NOT_FOUND","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"409":{"description":"RESOURCE_CONFLICT","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"500":{"description":"INTERNAL_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}}}
+      }
+    },
+    "/admin/products/{productId}/variants": {
+      "get": {
+        "tags": ["Admin"],
+        "operationId": "listAdminVariants",
+        "description": "Admin Web. ",
+        "security": [{"WebSession":[]}],
+        "parameters": [{"name":"productId","in":"path","required":true,"schema":{"type":"string","pattern":"^[1-9][0-9]*$"}}],
+        "responses": {"200":{"description":"Thành công","content":{"application/json":{"schema":{"type":"array","items":{"$ref":"#/components/schemas/Variant"}}}}},"401":{"description":"UNAUTHENTICATED / INVALID_CREDENTIALS","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"403":{"description":"FORBIDDEN / CSRF_INVALID","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"404":{"description":"NOT_FOUND","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"500":{"description":"INTERNAL_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}}}
+      },
+      "post": {
+        "tags": ["Admin"],
+        "operationId": "createAdminVariant",
+        "description": "Admin Web. Tồn bắt đầu bằng 0. Điều chỉnh qua API inventory.",
+        "security": [{"WebSession":[],"WebCsrf":[]}],
+        "parameters": [{"name":"productId","in":"path","required":true,"schema":{"type":"string","pattern":"^[1-9][0-9]*$"}}],
+        "requestBody": {"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/VariantInput"}}}},
+        "responses": {"201":{"description":"Thành công","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Variant"}}}},"400":{"description":"VALIDATION_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"401":{"description":"UNAUTHENTICATED / INVALID_CREDENTIALS","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"403":{"description":"FORBIDDEN / CSRF_INVALID","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"404":{"description":"NOT_FOUND","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"409":{"description":"RESOURCE_CONFLICT","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"500":{"description":"INTERNAL_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}}}
+      }
+    },
+    "/admin/products/{productId}/variants/{variantId}": {
+      "patch": {
+        "tags": ["Admin"],
+        "operationId": "updateAdminVariant",
+        "description": "Admin Web. Chỉ gửi trường cần cập nhật.",
+        "security": [{"WebSession":[],"WebCsrf":[]}],
+        "parameters": [{"name":"productId","in":"path","required":true,"schema":{"type":"string","pattern":"^[1-9][0-9]*$"}},{"name":"variantId","in":"path","required":true,"schema":{"type":"string","pattern":"^[1-9][0-9]*$"}}],
+        "requestBody": {"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/VariantPatch"}}}},
+        "responses": {"200":{"description":"Thành công","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Variant"}}}},"400":{"description":"VALIDATION_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"401":{"description":"UNAUTHENTICATED / INVALID_CREDENTIALS","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"403":{"description":"FORBIDDEN / CSRF_INVALID","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"404":{"description":"NOT_FOUND","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"409":{"description":"RESOURCE_CONFLICT","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"500":{"description":"INTERNAL_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}}}
+      },
+      "delete": {
+        "tags": ["Admin"],
+        "operationId": "removeAdminVariant",
+        "description": "Admin Web. Từ chối nếu FK còn tham chiếu; dùng trạng thái INACTIVE khi tài nguyên cần giữ cho lịch sử.",
+        "security": [{"WebSession":[],"WebCsrf":[]}],
+        "parameters": [{"name":"productId","in":"path","required":true,"schema":{"type":"string","pattern":"^[1-9][0-9]*$"}},{"name":"variantId","in":"path","required":true,"schema":{"type":"string","pattern":"^[1-9][0-9]*$"}}],
+        "responses": {"204":{"description":"Thành công"},"401":{"description":"UNAUTHENTICATED / INVALID_CREDENTIALS","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"403":{"description":"FORBIDDEN / CSRF_INVALID","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"404":{"description":"NOT_FOUND","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"409":{"description":"RESOURCE_CONFLICT","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"500":{"description":"INTERNAL_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}}}
+      }
+    },
+    "/admin/products/{productId}/images": {
+      "get": {
+        "tags": ["Admin"],
+        "operationId": "listAdminImages",
+        "description": "Admin Web. ",
+        "security": [{"WebSession":[]}],
+        "parameters": [{"name":"productId","in":"path","required":true,"schema":{"type":"string","pattern":"^[1-9][0-9]*$"}}],
+        "responses": {"200":{"description":"Thành công","content":{"application/json":{"schema":{"type":"array","items":{"$ref":"#/components/schemas/Image"}}}}},"401":{"description":"UNAUTHENTICATED / INVALID_CREDENTIALS","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"403":{"description":"FORBIDDEN / CSRF_INVALID","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"404":{"description":"NOT_FOUND","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"500":{"description":"INTERNAL_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}}}
+      },
+      "post": {
+        "tags": ["Admin"],
+        "operationId": "createAdminImage",
+        "description": "Admin Web. storageKey tham chiếu ảnh đã có; upload/storage theo Q08.",
+        "security": [{"WebSession":[],"WebCsrf":[]}],
+        "parameters": [{"name":"productId","in":"path","required":true,"schema":{"type":"string","pattern":"^[1-9][0-9]*$"}}],
+        "requestBody": {"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/ImageInput"}}}},
+        "responses": {"201":{"description":"Thành công","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Image"}}}},"400":{"description":"VALIDATION_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"401":{"description":"UNAUTHENTICATED / INVALID_CREDENTIALS","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"403":{"description":"FORBIDDEN / CSRF_INVALID","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"404":{"description":"NOT_FOUND","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"409":{"description":"RESOURCE_CONFLICT","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"500":{"description":"INTERNAL_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}}}
+      }
+    },
+    "/admin/products/{productId}/images/{imageId}": {
+      "patch": {
+        "tags": ["Admin"],
+        "operationId": "updateAdminImage",
+        "description": "Admin Web. Chỉ gửi trường cần cập nhật.",
+        "security": [{"WebSession":[],"WebCsrf":[]}],
+        "parameters": [{"name":"productId","in":"path","required":true,"schema":{"type":"string","pattern":"^[1-9][0-9]*$"}},{"name":"imageId","in":"path","required":true,"schema":{"type":"string","pattern":"^[1-9][0-9]*$"}}],
+        "requestBody": {"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/ImagePatch"}}}},
+        "responses": {"200":{"description":"Thành công","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Image"}}}},"400":{"description":"VALIDATION_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"401":{"description":"UNAUTHENTICATED / INVALID_CREDENTIALS","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"403":{"description":"FORBIDDEN / CSRF_INVALID","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"404":{"description":"NOT_FOUND","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"409":{"description":"RESOURCE_CONFLICT","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"500":{"description":"INTERNAL_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}}}
+      },
+      "delete": {
+        "tags": ["Admin"],
+        "operationId": "removeAdminImage",
+        "description": "Admin Web. Xóa liên kết ảnh. Vòng đời file và storage theo Q08.",
+        "security": [{"WebSession":[],"WebCsrf":[]}],
+        "parameters": [{"name":"productId","in":"path","required":true,"schema":{"type":"string","pattern":"^[1-9][0-9]*$"}},{"name":"imageId","in":"path","required":true,"schema":{"type":"string","pattern":"^[1-9][0-9]*$"}}],
+        "responses": {"204":{"description":"Thành công"},"401":{"description":"UNAUTHENTICATED / INVALID_CREDENTIALS","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"403":{"description":"FORBIDDEN / CSRF_INVALID","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"404":{"description":"NOT_FOUND","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"409":{"description":"RESOURCE_CONFLICT","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"500":{"description":"INTERNAL_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}}}
+      }
+    },
+    "/admin/inventory/{variantId}/adjustments": {
+      "post": {
+        "tags": ["Admin"],
+        "operationId": "adjustInventory",
+        "description": "Admin Web. Điều chỉnh trong giao dịch, từ chối tồn âm, ghi lý do và audit.",
+        "security": [{"WebSession":[],"WebCsrf":[]}],
+        "parameters": [{"name":"variantId","in":"path","required":true,"schema":{"type":"string","pattern":"^[1-9][0-9]*$"}}],
+        "requestBody": {"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/InventoryInput"}}}},
+        "responses": {"201":{"description":"Thành công","content":{"application/json":{"schema":{"$ref":"#/components/schemas/InventoryMovement"}}}},"400":{"description":"VALIDATION_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"401":{"description":"UNAUTHENTICATED / INVALID_CREDENTIALS","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"403":{"description":"FORBIDDEN / CSRF_INVALID","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"404":{"description":"NOT_FOUND","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"409":{"description":"INSUFFICIENT_STOCK","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"500":{"description":"INTERNAL_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}}}
+      },
+      "get": {
+        "tags": ["Admin"],
+        "operationId": "listInventoryAdjustments",
+        "description": "Admin Web. Lịch sử biến động của một biến thể, gồm điều chỉnh, checkout và hoàn tồn. Mới nhất trước; phá hòa theo ID giảm dần.",
+        "security": [{"WebSession":[]}],
+        "parameters": [{"name":"variantId","in":"path","required":true,"schema":{"type":"string","pattern":"^[1-9][0-9]*$"}},{"name":"page","in":"query","required":false,"schema":{"type":"integer","minimum":1,"default":1}},{"name":"pageSize","in":"query","required":false,"schema":{"type":"integer","minimum":1,"maximum":100,"default":20}}],
+        "responses": {"200":{"description":"Thành công","content":{"application/json":{"schema":{"$ref":"#/components/schemas/InventoryMovementPage"}}}},"400":{"description":"VALIDATION_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"401":{"description":"UNAUTHENTICATED","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"403":{"description":"FORBIDDEN","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"404":{"description":"NOT_FOUND","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"500":{"description":"INTERNAL_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}}}
+      }
+    },
+    "/admin/orders": {
+      "get": {
+        "tags": ["Admin"],
+        "operationId": "listAdminOrders",
+        "description": "Admin Web. ",
+        "security": [{"WebSession":[]}],
+        "parameters": [{"name":"page","in":"query","required":false,"schema":{"type":"integer","minimum":1,"default":1}},{"name":"pageSize","in":"query","required":false,"schema":{"type":"integer","minimum":1,"maximum":100,"default":20}},{"name":"status","in":"query","required":false,"schema":{"type":"string","enum":["PENDING","CONFIRMED","PACKING","SHIPPING","DELIVERED","CANCELLED"]}}],
+        "responses": {"200":{"description":"Thành công","content":{"application/json":{"schema":{"$ref":"#/components/schemas/OrderPage"}}}},"400":{"description":"VALIDATION_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"401":{"description":"UNAUTHENTICATED / INVALID_CREDENTIALS","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"403":{"description":"FORBIDDEN / CSRF_INVALID","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"500":{"description":"INTERNAL_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}}}
+      }
+    },
+    "/admin/orders/{orderId}": {
+      "get": {
+        "tags": ["Admin"],
+        "operationId": "getAdminOrder",
+        "description": "Admin Web. ",
+        "security": [{"WebSession":[]}],
+        "parameters": [{"name":"orderId","in":"path","required":true,"schema":{"type":"string","pattern":"^[1-9][0-9]*$"}}],
+        "responses": {"200":{"description":"Thành công","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Order"}}}},"401":{"description":"UNAUTHENTICATED / INVALID_CREDENTIALS","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"403":{"description":"FORBIDDEN / CSRF_INVALID","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"404":{"description":"NOT_FOUND","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"500":{"description":"INTERNAL_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}}}
+      }
+    },
+    "/admin/orders/{orderId}/status": {
+      "patch": {
+        "tags": ["Admin"],
+        "operationId": "advanceAdminOrder",
+        "description": "Admin Web. Chuyển một bước đúng thứ tự từ PENDING đến SHIPPING.",
+        "security": [{"WebSession":[],"WebCsrf":[]}],
+        "parameters": [{"name":"orderId","in":"path","required":true,"schema":{"type":"string","pattern":"^[1-9][0-9]*$"}}],
+        "requestBody": {"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/OrderTransition"}}}},
+        "responses": {"200":{"description":"Thành công","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Order"}}}},"400":{"description":"VALIDATION_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"401":{"description":"UNAUTHENTICATED / INVALID_CREDENTIALS","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"403":{"description":"FORBIDDEN / CSRF_INVALID","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"404":{"description":"NOT_FOUND","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"409":{"description":"INVALID_ORDER_STATE","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"500":{"description":"INTERNAL_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}}}
+      }
+    },
+    "/admin/orders/{orderId}/deliver": {
+      "post": {
+        "tags": ["Admin"],
+        "operationId": "confirmDeliveryAndCod",
+        "description": "Admin Web. Chỉ SHIPPING. Ghi DELIVERED và COD PAID trong cùng giao dịch. Gửi lại khi đã DELIVERED và PAID trả đơn hiện tại, không ghi nhận thu tiền lần nữa.",
+        "security": [{"WebSession":[],"WebCsrf":[]}],
+        "parameters": [{"name":"orderId","in":"path","required":true,"schema":{"type":"string","pattern":"^[1-9][0-9]*$"}}],
+        "responses": {"200":{"description":"Thành công","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Order"}}}},"401":{"description":"UNAUTHENTICATED / INVALID_CREDENTIALS","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"403":{"description":"FORBIDDEN / CSRF_INVALID","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"404":{"description":"NOT_FOUND","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"409":{"description":"INVALID_ORDER_STATE","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"500":{"description":"INTERNAL_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}}}
+      }
+    },
+    "/admin/orders/{orderId}/cancel": {
+      "post": {
+        "tags": ["Admin"],
+        "operationId": "cancelAdminOrder",
+        "description": "Admin Web. Chỉ trước SHIPPING. Yêu cầu lý do. Hủy lại đơn đã CANCELLED không hoàn tồn thêm.",
+        "security": [{"WebSession":[],"WebCsrf":[]}],
+        "parameters": [{"name":"orderId","in":"path","required":true,"schema":{"type":"string","pattern":"^[1-9][0-9]*$"}}],
+        "requestBody": {"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/Cancellation"}}}},
+        "responses": {"200":{"description":"Thành công","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Order"}}}},"400":{"description":"VALIDATION_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"401":{"description":"UNAUTHENTICATED / INVALID_CREDENTIALS","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"403":{"description":"FORBIDDEN / CSRF_INVALID","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"404":{"description":"NOT_FOUND","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"409":{"description":"INVALID_ORDER_STATE","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"500":{"description":"INTERNAL_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}}}
+      }
+    },
+    "/admin/reviews": {
+      "get": {
+        "tags": ["Admin"],
+        "operationId": "listAdminReviews",
+        "description": "Admin Web. ",
+        "security": [{"WebSession":[]}],
+        "parameters": [{"name":"page","in":"query","required":false,"schema":{"type":"integer","minimum":1,"default":1}},{"name":"pageSize","in":"query","required":false,"schema":{"type":"integer","minimum":1,"maximum":100,"default":20}},{"name":"status","in":"query","required":false,"schema":{"type":"string","enum":["VISIBLE","HIDDEN"]}}],
+        "responses": {"200":{"description":"Thành công","content":{"application/json":{"schema":{"$ref":"#/components/schemas/AdminReviewPage"}}}},"400":{"description":"VALIDATION_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"401":{"description":"UNAUTHENTICATED / INVALID_CREDENTIALS","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"403":{"description":"FORBIDDEN / CSRF_INVALID","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"500":{"description":"INTERNAL_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}}}
+      }
+    },
+    "/admin/reviews/{reviewId}/visibility": {
+      "patch": {
+        "tags": ["Admin"],
+        "operationId": "moderateReview",
+        "description": "Admin Web. Giữ nội dung; cập nhật hiển thị và audit cùng giao dịch. Lệnh lặp cùng trạng thái không ghi thêm audit.",
+        "security": [{"WebSession":[],"WebCsrf":[]}],
+        "parameters": [{"name":"reviewId","in":"path","required":true,"schema":{"type":"string","pattern":"^[1-9][0-9]*$"}}],
+        "requestBody": {"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/Moderation"},"example":{"status":"HIDDEN"}}}},
+        "responses": {"200":{"description":"Thành công","content":{"application/json":{"schema":{"$ref":"#/components/schemas/AdminReview"},"example":{"id":"90","productId":"11","orderItemId":"82","userId":"42","rating":4,"content":"Áo vừa size","createdAt":"2026-11-20T10:00:00Z","status":"HIDDEN"}}}},"400":{"description":"VALIDATION_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"401":{"description":"UNAUTHENTICATED / INVALID_CREDENTIALS","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"403":{"description":"FORBIDDEN / CSRF_INVALID","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"404":{"description":"NOT_FOUND","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"500":{"description":"INTERNAL_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}}}
+      }
+    },
+    "/admin/users": {
+      "get": {
+        "tags": ["Admin"],
+        "operationId": "listAdminUsers",
+        "description": "Admin Web. ",
+        "security": [{"WebSession":[]}],
+        "parameters": [{"name":"page","in":"query","required":false,"schema":{"type":"integer","minimum":1,"default":1}},{"name":"pageSize","in":"query","required":false,"schema":{"type":"integer","minimum":1,"maximum":100,"default":20}},{"name":"status","in":"query","required":false,"schema":{"type":"string","enum":["ACTIVE","DISABLED"]}}],
+        "responses": {"200":{"description":"Thành công","content":{"application/json":{"schema":{"$ref":"#/components/schemas/UserPage"}}}},"400":{"description":"VALIDATION_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"401":{"description":"UNAUTHENTICATED / INVALID_CREDENTIALS","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"403":{"description":"FORBIDDEN / CSRF_INVALID","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"500":{"description":"INTERNAL_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}}}
+      }
+    },
+    "/admin/users/{userId}/status": {
+      "patch": {
+        "tags": ["Admin"],
+        "operationId": "setAccountStatus",
+        "description": "Admin Web. MVP A quản lý trạng thái Customer. Khóa tài khoản thu hồi phiên và ghi audit.",
+        "security": [{"WebSession":[],"WebCsrf":[]}],
+        "parameters": [{"name":"userId","in":"path","required":true,"schema":{"type":"string","pattern":"^[1-9][0-9]*$"}}],
+        "requestBody": {"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/AccountStatus"}}}},
+        "responses": {"200":{"description":"Thành công","content":{"application/json":{"schema":{"$ref":"#/components/schemas/User"}}}},"400":{"description":"VALIDATION_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"401":{"description":"UNAUTHENTICATED / INVALID_CREDENTIALS","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"403":{"description":"FORBIDDEN / CSRF_INVALID","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"404":{"description":"NOT_FOUND","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"409":{"description":"ACCOUNT_STATUS_CONFLICT","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"500":{"description":"INTERNAL_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}}}
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {"AndroidBearer":{"type":"http","scheme":"bearer","description":"Opaque session token from native login."},"WebSession":{"type":"apiKey","in":"cookie","name":"__Host-session"},"WebCsrf":{"type":"apiKey","in":"header","name":"X-CSRF-Token"}},
+    "schemas": {
+      "Error": {"type":"object","additionalProperties":false,"properties":{"code":{"type":"string","minLength":1},"message":{"type":"string","minLength":1},"details":{"type":"object","additionalProperties":true},"requestId":{"type":"string","minLength":1}},"required":["code","message","requestId"]},
+      "Id": {"type":"string","pattern":"^[1-9][0-9]*$"},
+      "Money": {"type":"string","pattern":"^[0-9]{1,10}\\.[0-9]{2}$"},
+      "Credentials": {"type":"object","additionalProperties":false,"properties":{"email":{"type":"string","format":"email"},"password":{"type":"string","format":"password","minLength":1}},"required":["email","password"]},
+      "User": {"type":"object","additionalProperties":false,"properties":{"id":{"type":"string","pattern":"^[1-9][0-9]*$"},"email":{"type":"string","format":"email"},"role":{"type":"string","enum":["CUSTOMER","ADMIN"]},"status":{"type":"string","enum":["ACTIVE","DISABLED"]}},"required":["id","email","role","status"]},
+      "NativeSession": {"type":"object","additionalProperties":false,"properties":{"user":{"$ref":"#/components/schemas/User"},"token":{"type":"string","minLength":1},"expiresAt":{"type":"string","format":"date-time"}},"required":["user","token","expiresAt"]},
+      "WebSession": {"type":"object","additionalProperties":false,"properties":{"user":{"$ref":"#/components/schemas/User"},"csrfToken":{"type":"string","minLength":1},"expiresAt":{"type":"string","format":"date-time"}},"required":["user","csrfToken","expiresAt"]},
+      "Csrf": {"type":"object","additionalProperties":false,"properties":{"csrfToken":{"type":"string","minLength":1}},"required":["csrfToken"]},
+      "AddressInput": {"type":"object","additionalProperties":false,"properties":{"name":{"type":"string","minLength":1},"phone":{"type":"string","minLength":1},"addressText":{"type":"string","minLength":1},"isDefault":{"type":"boolean"}},"required":["name","phone","addressText"]},
+      "Address": {"type":"object","additionalProperties":false,"properties":{"id":{"type":"string","pattern":"^[1-9][0-9]*$"},"name":{"type":"string","minLength":1},"phone":{"type":"string","minLength":1},"addressText":{"type":"string","minLength":1},"isDefault":{"type":"boolean"}},"required":["id","name","phone","addressText","isDefault"]},
+      "CategoryInput": {"type":"object","additionalProperties":false,"properties":{"name":{"type":"string","minLength":1},"slug":{"type":"string","minLength":1},"status":{"type":"string","enum":["ACTIVE","INACTIVE"]}},"required":["name","slug","status"]},
+      "Category": {"type":"object","additionalProperties":false,"properties":{"id":{"type":"string","pattern":"^[1-9][0-9]*$"},"name":{"type":"string","minLength":1},"slug":{"type":"string","minLength":1},"status":{"type":"string","enum":["ACTIVE","INACTIVE"]}},"required":["id","name","slug","status"]},
+      "VariantInput": {"type":"object","additionalProperties":false,"properties":{"sku":{"type":"string","minLength":1},"size":{"type":"string","minLength":1},"color":{"type":"string","minLength":1},"price":{"type":"string","pattern":"^[0-9]{1,10}\\.[0-9]{2}$"},"status":{"type":"string","enum":["ACTIVE","INACTIVE"]}},"required":["sku","size","color","price","status"]},
+      "Variant": {"type":"object","additionalProperties":false,"properties":{"id":{"type":"string","pattern":"^[1-9][0-9]*$"},"sku":{"type":"string","minLength":1},"size":{"type":"string","minLength":1},"color":{"type":"string","minLength":1},"price":{"type":"string","pattern":"^[0-9]{1,10}\\.[0-9]{2}$"},"stockQuantity":{"type":"integer","minimum":0},"status":{"type":"string","enum":["ACTIVE","INACTIVE"]}},"required":["id","sku","size","color","price","stockQuantity","status"]},
+      "ImageInput": {"type":"object","additionalProperties":false,"properties":{"storageKey":{"type":"string","minLength":1},"altText":{"type":"string"},"sortOrder":{"type":"integer","minimum":0}},"required":["storageKey"]},
+      "Image": {"type":"object","additionalProperties":false,"properties":{"id":{"type":"string","pattern":"^[1-9][0-9]*$"},"url":{"type":"string","format":"uri-reference"},"altText":{"type":"string"},"sortOrder":{"type":"integer","minimum":0}},"required":["id","url","altText","sortOrder"]},
+      "ProductInput": {"type":"object","additionalProperties":false,"properties":{"categoryId":{"type":"string","pattern":"^[1-9][0-9]*$"},"name":{"type":"string","minLength":1},"slug":{"type":"string","minLength":1},"description":{"type":"string"},"status":{"type":"string","enum":["ACTIVE","INACTIVE"]}},"required":["categoryId","name","slug","description","status"]},
+      "Product": {"type":"object","additionalProperties":false,"properties":{"id":{"type":"string","pattern":"^[1-9][0-9]*$"},"categoryId":{"type":"string","pattern":"^[1-9][0-9]*$"},"name":{"type":"string","minLength":1},"slug":{"type":"string","minLength":1},"description":{"type":"string"},"status":{"type":"string","enum":["ACTIVE","INACTIVE"]},"variants":{"type":"array","items":{"$ref":"#/components/schemas/Variant"}},"images":{"type":"array","items":{"$ref":"#/components/schemas/Image"}}},"required":["id","categoryId","name","slug","description","status","variants","images"]},
+      "CartLine": {"type":"object","additionalProperties":false,"properties":{"variantId":{"type":"string","pattern":"^[1-9][0-9]*$"},"quantity":{"type":"integer","minimum":1}},"required":["variantId","quantity"]},
+      "CartLineView": {"type":"object","additionalProperties":false,"properties":{"variantId":{"type":"string","pattern":"^[1-9][0-9]*$"},"quantity":{"type":"integer","minimum":1},"unitPrice":{"type":"string","pattern":"^[0-9]{1,10}\\.[0-9]{2}$"},"lineTotal":{"type":"string","pattern":"^[0-9]{1,10}\\.[0-9]{2}$"}},"required":["variantId","quantity","unitPrice","lineTotal"]},
+      "Quantity": {"type":"object","additionalProperties":false,"properties":{"quantity":{"type":"integer","minimum":1}},"required":["quantity"]},
+      "Cart": {"type":"object","additionalProperties":false,"properties":{"items":{"type":"array","items":{"$ref":"#/components/schemas/CartLineView"}},"subtotal":{"type":"string","pattern":"^[0-9]{1,10}\\.[0-9]{2}$"}},"required":["items","subtotal"]},
+      "Checkout": {"type":"object","additionalProperties":false,"properties":{"addressId":{"type":"string","pattern":"^[1-9][0-9]*$"},"method":{"type":"string","enum":["COD"]},"items":{"type":"array","minItems":1,"items":{"$ref":"#/components/schemas/CartLine"}}},"required":["addressId","method","items"]},
+      "OrderLine": {"type":"object","additionalProperties":false,"properties":{"id":{"type":"string","pattern":"^[1-9][0-9]*$"},"variantId":{"type":"string","pattern":"^[1-9][0-9]*$"},"sku":{"type":"string","minLength":1},"name":{"type":"string","minLength":1},"size":{"type":"string","minLength":1},"color":{"type":"string","minLength":1},"quantity":{"type":"integer","minimum":1},"unitPrice":{"type":"string","pattern":"^[0-9]{1,10}\\.[0-9]{2}$"},"lineTotal":{"type":"string","pattern":"^[0-9]{1,10}\\.[0-9]{2}$"}},"required":["id","variantId","sku","name","size","color","quantity","unitPrice","lineTotal"]},
+      "Order": {"type":"object","additionalProperties":false,"properties":{"id":{"type":"string","pattern":"^[1-9][0-9]*$"},"status":{"type":"string","enum":["PENDING","CONFIRMED","PACKING","SHIPPING","DELIVERED","CANCELLED"]},"paymentStatus":{"type":"string","enum":["UNPAID","PAID"]},"subtotal":{"type":"string","pattern":"^[0-9]{1,10}\\.[0-9]{2}$"},"shippingFee":{"type":"string","pattern":"^[0-9]{1,10}\\.[0-9]{2}$"},"total":{"type":"string","pattern":"^[0-9]{1,10}\\.[0-9]{2}$"},"address":{"type":"object","additionalProperties":false,"properties":{"name":{"type":"string","minLength":1},"phone":{"type":"string","minLength":1},"addressText":{"type":"string","minLength":1}},"required":["name","phone","addressText"]},"items":{"type":"array","items":{"$ref":"#/components/schemas/OrderLine"}},"createdAt":{"type":"string","format":"date-time"}},"required":["id","status","paymentStatus","subtotal","shippingFee","total","address","items","createdAt"]},
+      "ReviewInput": {"type":"object","additionalProperties":false,"properties":{"orderItemId":{"type":"string","pattern":"^[1-9][0-9]*$"},"rating":{"type":"integer","minimum":1,"maximum":5},"content":{"type":"string","minLength":1}},"required":["orderItemId","rating","content"]},
+      "Review": {"type":"object","additionalProperties":false,"properties":{"id":{"type":"string","pattern":"^[1-9][0-9]*$"},"productId":{"type":"string","pattern":"^[1-9][0-9]*$"},"rating":{"type":"integer","minimum":1,"maximum":5},"content":{"type":"string","minLength":1},"createdAt":{"type":"string","format":"date-time"}},"required":["id","productId","rating","content","createdAt"]},
+      "Moderation": {"type":"object","additionalProperties":false,"properties":{"status":{"type":"string","enum":["VISIBLE","HIDDEN"]}},"required":["status"]},
+      "AdminReview": {"type":"object","additionalProperties":false,"properties":{"id":{"type":"string","pattern":"^[1-9][0-9]*$"},"productId":{"type":"string","pattern":"^[1-9][0-9]*$"},"orderItemId":{"type":"string","pattern":"^[1-9][0-9]*$"},"userId":{"type":"string","pattern":"^[1-9][0-9]*$"},"rating":{"type":"integer","minimum":1,"maximum":5},"content":{"type":"string","minLength":1},"createdAt":{"type":"string","format":"date-time"},"status":{"type":"string","enum":["VISIBLE","HIDDEN"]}},"required":["id","productId","orderItemId","userId","rating","content","createdAt","status"]},
+      "InventoryInput": {"type":"object","additionalProperties":false,"properties":{"delta":{"type":"integer","not":{"enum":[0]}},"reason":{"type":"string","minLength":1}},"required":["delta","reason"]},
+      "InventoryMovement": {"type":"object","additionalProperties":false,"properties":{"id":{"type":"string","pattern":"^[1-9][0-9]*$"},"variantId":{"type":"string","pattern":"^[1-9][0-9]*$"},"delta":{"type":"integer"},"reason":{"type":"string","minLength":1},"stockQuantity":{"type":"integer","minimum":0,"description":"Tồn ngay sau biến động đối với phản hồi tạo; dùng giá trị đã ghi nhận hoặc suy ra nhất quán khi đọc lịch sử."},"createdAt":{"type":"string","format":"date-time"}},"required":["id","variantId","delta","reason","stockQuantity","createdAt"]},
+      "OrderTransition": {"type":"object","additionalProperties":false,"properties":{"status":{"type":"string","enum":["CONFIRMED","PACKING","SHIPPING"]}},"required":["status"]},
+      "Cancellation": {"type":"object","additionalProperties":false,"properties":{"reason":{"type":"string","minLength":1}},"required":["reason"]},
+      "AccountStatus": {"type":"object","additionalProperties":false,"properties":{"status":{"type":"string","enum":["ACTIVE","DISABLED"]}},"required":["status"]},
+      "ProductPage": {"type":"object","additionalProperties":false,"properties":{"items":{"type":"array","items":{"$ref":"#/components/schemas/Product"}},"page":{"type":"integer","minimum":1},"pageSize":{"type":"integer","minimum":1},"total":{"type":"integer","minimum":0}},"required":["items","page","pageSize","total"]},
+      "OrderPage": {"type":"object","additionalProperties":false,"properties":{"items":{"type":"array","items":{"$ref":"#/components/schemas/Order"}},"page":{"type":"integer","minimum":1},"pageSize":{"type":"integer","minimum":1},"total":{"type":"integer","minimum":0}},"required":["items","page","pageSize","total"]},
+      "ReviewPage": {"type":"object","additionalProperties":false,"properties":{"items":{"type":"array","items":{"$ref":"#/components/schemas/Review"}},"page":{"type":"integer","minimum":1},"pageSize":{"type":"integer","minimum":1},"total":{"type":"integer","minimum":0}},"required":["items","page","pageSize","total"]},
+      "AdminReviewPage": {"type":"object","additionalProperties":false,"properties":{"items":{"type":"array","items":{"$ref":"#/components/schemas/AdminReview"}},"page":{"type":"integer","minimum":1},"pageSize":{"type":"integer","minimum":1},"total":{"type":"integer","minimum":0}},"required":["items","page","pageSize","total"]},
+      "UserPage": {"type":"object","additionalProperties":false,"properties":{"items":{"type":"array","items":{"$ref":"#/components/schemas/User"}},"page":{"type":"integer","minimum":1},"pageSize":{"type":"integer","minimum":1},"total":{"type":"integer","minimum":0}},"required":["items","page","pageSize","total"]},
+      "AddressPatch": {"type":"object","additionalProperties":false,"properties":{"name":{"type":"string","minLength":1},"phone":{"type":"string","minLength":1},"addressText":{"type":"string","minLength":1},"isDefault":{"type":"boolean"}},"minProperties":1},
+      "CategoryPatch": {"type":"object","additionalProperties":false,"properties":{"name":{"type":"string","minLength":1},"slug":{"type":"string","minLength":1},"status":{"type":"string","enum":["ACTIVE","INACTIVE"]}},"minProperties":1},
+      "ProductPatch": {"type":"object","additionalProperties":false,"properties":{"categoryId":{"type":"string","pattern":"^[1-9][0-9]*$"},"name":{"type":"string","minLength":1},"slug":{"type":"string","minLength":1},"description":{"type":"string"},"status":{"type":"string","enum":["ACTIVE","INACTIVE"]}},"minProperties":1},
+      "VariantPatch": {"type":"object","additionalProperties":false,"properties":{"sku":{"type":"string","minLength":1},"size":{"type":"string","minLength":1},"color":{"type":"string","minLength":1},"price":{"type":"string","pattern":"^[0-9]{1,10}\\.[0-9]{2}$"},"status":{"type":"string","enum":["ACTIVE","INACTIVE"]}},"minProperties":1},
+      "ImagePatch": {"type":"object","additionalProperties":false,"properties":{"storageKey":{"type":"string","minLength":1},"altText":{"type":"string"},"sortOrder":{"type":"integer","minimum":0}},"minProperties":1},
+      "InventoryMovementPage": {"type":"object","additionalProperties":false,"properties":{"items":{"type":"array","items":{"$ref":"#/components/schemas/InventoryMovementHistory"}},"page":{"type":"integer","minimum":1},"pageSize":{"type":"integer","minimum":1},"total":{"type":"integer","minimum":0}},"required":["items","page","pageSize","total"]},
+      "InventoryMovementHistory": {"type":"object","additionalProperties":false,"properties":{"id":{"type":"string","pattern":"^[1-9][0-9]*$"},"variantId":{"type":"string","pattern":"^[1-9][0-9]*$"},"delta":{"type":"integer"},"reason":{"type":"string","minLength":1},"createdAt":{"type":"string","format":"date-time"}},"required":["id","variantId","delta","reason","createdAt"]}
+    }
+  }
+}

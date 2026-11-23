@@ -1,0 +1,32 @@
+# Dependencies / builds
+node_modules/
+/apps/api/src/generated/prisma/
+dist/
+build/
+coverage/
+.expo/
+.expo-shared/
+.next/
+# Environment / credentials
+.env
+.env.*
+!.env.example
+!.env.*.example
+# Logs / OS / IDE
+*.log
+.DS_Store
+Thumbs.db
+~$*.docx
+.vscode/*
+!.vscode/extensions.json
+# Local data / uploads / database
+uploads/
+storage/local/
+*.sql.gz
+*.dump
+# Python / AI
+__pycache__/
+.venv/
+.ipynb_checkpoints/
+# Personal learning documents
+/learning/
