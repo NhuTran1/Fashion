@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Animated,
   Image,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -10,9 +12,12 @@ import {
   View,
   ViewStyle,
 } from 'react-native';
-import { colors, radius, spacing, typography } from '../theme/tokens';
+import { colors, radius, shadows, spacing, typography } from '../theme/tokens';
+import { ShimmerBlock } from './Motion';
 
-/** Primary/secondary/danger/ghost architectural button with built-in loading lock. */
+const USE_NATIVE_DRIVER = Platform.OS !== 'web';
+
+/** Tactile pill/rounded button with spring press bounce, hover lift, and built-in loading lock. */
 export function EditorialButton({
   label,
   onPress,
@@ -31,6 +36,29 @@ export function EditorialButton({
   compact?: boolean;
 }): React.ReactElement {
   const isDisabled = disabled || loading;
+  const scale = useRef(new Animated.Value(1)).current;
+  const [hovered, setHovered] = useState(false);
+
+  /** Compress slightly with spring physics on press. */
+  const handlePressIn = () => {
+    if (isDisabled) return;
+    Animated.spring(scale, {
+      toValue: 0.96,
+      friction: 7,
+      tension: 200,
+      useNativeDriver: USE_NATIVE_DRIVER,
+    }).start();
+  };
+
+  /** Spring back cleanly on release. */
+  const handlePressOut = () => {
+    Animated.spring(scale, {
+      toValue: 1,
+      friction: 6,
+      tension: 180,
+      useNativeDriver: USE_NATIVE_DRIVER,
+    }).start();
+  };
 
   const containerStyle = [
     styles.btnBase,
@@ -39,6 +67,8 @@ export function EditorialButton({
     variant === 'secondary' && styles.btnSecondary,
     variant === 'danger' && styles.btnDanger,
     variant === 'ghost' && styles.btnGhost,
+    variant === 'primary' && !isDisabled && shadows.soft,
+    hovered && !isDisabled && styles.btnHovered,
     isDisabled && styles.btnDisabled,
     style,
   ];
@@ -53,26 +83,32 @@ export function EditorialButton({
   ];
 
   return (
-    <Pressable
-      onPress={onPress}
-      disabled={isDisabled}
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      style={({ pressed }) => [containerStyle, pressed && !isDisabled && { opacity: 0.85 }]}
-    >
-      {loading ? (
-        <ActivityIndicator
-          size="small"
-          color={variant === 'primary' || variant === 'danger' ? '#FFFFFF' : colors.accent}
-        />
-      ) : (
-        <Text style={textStyle}>{label}</Text>
-      )}
-    </Pressable>
+    <Animated.View style={{ transform: [{ scale }] }}>
+      <Pressable
+        onPress={onPress}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        onHoverIn={() => setHovered(true)}
+        onHoverOut={() => setHovered(false)}
+        disabled={isDisabled}
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        style={containerStyle}
+      >
+        {loading ? (
+          <ActivityIndicator
+            size="small"
+            color={variant === 'primary' || variant === 'danger' ? '#FFFFFF' : colors.accent}
+          />
+        ) : (
+          <Text style={textStyle}>{label}</Text>
+        )}
+      </Pressable>
+    </Animated.View>
   );
 }
 
-/** Hairline status pill with semantic tone for order, payment, and catalog statuses. */
+/** Smooth pill status badge with semantic background tint and soft perimeter. */
 export function StatusBadge({
   label,
   tone = 'neutral',
@@ -82,10 +118,10 @@ export function StatusBadge({
 }): React.ReactElement {
   const palette: Record<typeof tone, { bg: string; fg: string; border: string }> = {
     neutral: { bg: colors.surfaceAlt, fg: colors.muted, border: colors.border },
-    accent: { bg: colors.accentSoft, fg: colors.accent, border: '#C9D8EA' },
-    success: { bg: colors.successSoft, fg: colors.success, border: '#BCE0CE' },
-    warning: { bg: colors.warningSoft, fg: colors.warning, border: '#E8CFA7' },
-    danger: { bg: colors.dangerSoft, fg: colors.danger, border: '#EABEC4' },
+    accent: { bg: colors.accentSoft, fg: colors.accent, border: '#CFDAEC' },
+    success: { bg: colors.successSoft, fg: colors.success, border: '#C2E4D3' },
+    warning: { bg: colors.warningSoft, fg: colors.warning, border: '#EED6B2' },
+    danger: { bg: colors.dangerSoft, fg: colors.danger, border: '#F0C5CD' },
   };
   const p = palette[tone];
   return (
@@ -96,19 +132,22 @@ export function StatusBadge({
 }
 
 /**
- * Product visual frame supporting both local garment:// artwork tokens (for 100% offline
- * cross-platform Android/Web rendering) and remote http(s) URLs with loading/error states.
+ * Soft-curved garment lookbook visual frame with layered ambient depth, atelier garment
+ * illustration for local garment:// tokens, and fade-in loading for remote URLs.
  */
 export function GarmentArtwork({
   uri,
   altText,
   height = 220,
+  hideCaption = false,
 }: {
   uri?: string;
   altText: string;
   height?: number;
+  hideCaption?: boolean;
 }): React.ReactElement {
   const [imgFailed, setImgFailed] = useState(false);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
 
   if (uri && uri.startsWith('garment://')) {
     const [, rawTone = '%231E3A5F', rawSil = 'shirt', rawTitle = 'SỞI'] = uri.split('://')[1]
@@ -124,19 +163,28 @@ export function GarmentArtwork({
       toneHex.toLowerCase() === '#3c4d3b' ||
       toneHex.toLowerCase() === '#24456e' ||
       toneHex.toLowerCase() === '#6b4c3b';
-    const fg = isDark ? 'rgba(255,255,255,0.88)' : 'rgba(24,26,31,0.86)';
-    const line = isDark ? 'rgba(255,255,255,0.28)' : 'rgba(24,26,31,0.2)';
+    const fg = isDark ? 'rgba(255,255,255,0.92)' : 'rgba(23,22,27,0.88)';
+    const line = isDark ? 'rgba(255,255,255,0.28)' : 'rgba(23,22,27,0.18)';
+    const orbTint = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.55)';
 
     return (
       <View
         style={[styles.artContainer, { height, backgroundColor: toneHex }]}
         accessibilityLabel={altText}
       >
+        {/* Layered ambient textile sheen circles */}
+        <View style={[styles.artGlowTop, { backgroundColor: orbTint }]} />
+        <View style={[styles.artGlowBottom, { backgroundColor: orbTint }]} />
+
         <View style={[styles.artInnerFrame, { borderColor: line }]}>
           <GarmentSilhouette kind={silhouette} stroke={line} />
-          <Text style={[styles.artCaption, { color: fg }]} numberOfLines={1}>
-            {title}
-          </Text>
+          {!hideCaption ? (
+            <View style={styles.artCaptionPill}>
+              <Text style={[styles.artCaption, { color: fg }]} numberOfLines={1}>
+                {title}
+              </Text>
+            </View>
+          ) : null}
         </View>
       </View>
     );
@@ -144,28 +192,41 @@ export function GarmentArtwork({
 
   if (!uri || imgFailed) {
     return (
-      <View style={[styles.artContainer, styles.artFallback, { height }]} accessibilityLabel={altText}>
+      <View
+        style={[styles.artContainer, styles.artFallback, { height }]}
+        accessibilityLabel={altText}
+      >
         <Text style={styles.artFallbackText}>{altText || 'Ảnh sản phẩm'}</Text>
       </View>
     );
   }
 
   return (
-    <Image
-      source={{ uri }}
-      accessibilityLabel={altText}
-      onError={() => setImgFailed(true)}
-      style={[styles.artImage, { height }]}
-      resizeMode="cover"
-    />
+    <Animated.View style={[styles.artImageWrap, { height, opacity: fadeAnim }]}>
+      <Image
+        source={{ uri }}
+        accessibilityLabel={altText}
+        onLoad={() =>
+          Animated.timing(fadeAnim, {
+            toValue: 1,
+            duration: 280,
+            useNativeDriver: USE_NATIVE_DRIVER,
+          }).start()
+        }
+        onError={() => setImgFailed(true)}
+        style={[styles.artImage, { height }]}
+        resizeMode="cover"
+      />
+    </Animated.View>
   );
 }
 
-/** Minimal geometric garment silhouette drawn with pure RN Views (no external SVG dependency). */
+/** Detailed soft-lined garment silhouette with hanger/lapel cues. */
 function GarmentSilhouette({ kind, stroke }: { kind: string; stroke: string }): React.ReactElement {
   if (kind === 'trouser') {
     return (
       <View style={styles.silWrap}>
+        <View style={[styles.silHangerHook, { borderColor: stroke }]} />
         <View style={[styles.silWaist, { borderColor: stroke }]} />
         <View style={styles.silLegs}>
           <View style={[styles.silLeg, { borderColor: stroke }]} />
@@ -177,20 +238,26 @@ function GarmentSilhouette({ kind, stroke }: { kind: string; stroke: string }): 
   if (kind === 'coat') {
     return (
       <View style={styles.silWrap}>
+        <View style={[styles.silHangerHook, { borderColor: stroke }]} />
         <View style={[styles.silCollar, { borderColor: stroke }]} />
-        <View style={[styles.silCoatBody, { borderColor: stroke }]} />
+        <View style={[styles.silCoatBody, { borderColor: stroke }]}>
+          <View style={[styles.silSeamCenter, { backgroundColor: stroke }]} />
+        </View>
       </View>
     );
   }
   return (
     <View style={styles.silWrap}>
+      <View style={[styles.silHangerHook, { borderColor: stroke }]} />
       <View style={[styles.silCollar, { borderColor: stroke }]} />
-      <View style={[styles.silShirtBody, { borderColor: stroke }]} />
+      <View style={[styles.silShirtBody, { borderColor: stroke }]}>
+        <View style={[styles.silPocket, { borderColor: stroke }]} />
+      </View>
     </View>
   );
 }
 
-/** Unified Loading, Empty, or Error + Retry state container required by M1-09 & M1-10. */
+/** Unified Loading (with pulsing shimmer bars), Empty, or Error + Retry state container. */
 export function StateCard({
   kind,
   title,
@@ -205,8 +272,14 @@ export function StateCard({
   onAction?: () => void;
 }): React.ReactElement {
   return (
-    <View style={[styles.stateCard, kind === 'error' && styles.stateCardError]}>
-      {kind === 'loading' && <ActivityIndicator size="small" color={colors.accent} />}
+    <View style={[styles.stateCard, shadows.soft, kind === 'error' && styles.stateCardError]}>
+      {kind === 'loading' ? (
+        <View style={styles.loadingWrap}>
+          <ActivityIndicator size="small" color={colors.accent} />
+          <ShimmerBlock height={12} width="60%" borderRadius={radius.pill} />
+          <ShimmerBlock height={10} width="40%" borderRadius={radius.pill} />
+        </View>
+      ) : null}
       <Text style={[styles.stateTitle, kind === 'error' && { color: colors.danger }]}>{title}</Text>
       {message ? <Text style={styles.stateMessage}>{message}</Text> : null}
       {actionLabel && onAction ? (
@@ -222,20 +295,37 @@ export function StateCard({
   );
 }
 
-/** Labeled input field with optional inline validation hint. */
+/** Soft-curved labeled input field with focus border highlight and validation text. */
 export function FieldInput({
   label,
   error,
   style,
+  onFocus,
+  onBlur,
   ...rest
 }: TextInputProps & { label: string; error?: string }): React.ReactElement {
+  const [focused, setFocused] = useState(false);
+
   return (
     <View style={styles.fieldGroup}>
       <Text style={styles.fieldLabel}>{label}</Text>
       <TextInput
         placeholderTextColor={colors.muted}
+        onFocus={(e) => {
+          setFocused(true);
+          onFocus?.(e);
+        }}
+        onBlur={(e) => {
+          setFocused(false);
+          onBlur?.(e);
+        }}
         {...rest}
-        style={[styles.input, error ? styles.inputError : undefined, style]}
+        style={[
+          styles.input,
+          focused && styles.inputFocused,
+          error ? styles.inputError : undefined,
+          style,
+        ]}
       />
       {error ? <Text style={styles.fieldError}>{error}</Text> : null}
     </View>
@@ -244,19 +334,19 @@ export function FieldInput({
 
 const styles = StyleSheet.create({
   btnBase: {
-    minHeight: 42,
-    paddingHorizontal: spacing.lg,
+    minHeight: 44,
+    paddingHorizontal: spacing.xl,
     paddingVertical: spacing.sm,
-    borderRadius: radius.xs,
+    borderRadius: radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: 'transparent',
   },
   btnCompact: {
-    minHeight: 34,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
+    minHeight: 36,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: 6,
   },
   btnPrimary: {
     backgroundColor: colors.accent,
@@ -274,8 +364,11 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
     borderColor: 'transparent',
   },
+  btnHovered: {
+    opacity: 0.92,
+  },
   btnDisabled: {
-    opacity: 0.48,
+    opacity: 0.45,
   },
   btnText: {
     fontFamily: typography.sans,
@@ -286,9 +379,9 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   badge: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 3,
-    borderRadius: radius.xs,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 4,
+    borderRadius: radius.pill,
     borderWidth: 1,
     alignSelf: 'flex-start',
   },
@@ -299,20 +392,43 @@ const styles = StyleSheet.create({
   },
   artContainer: {
     width: '100%',
-    borderRadius: radius.xs,
+    borderRadius: radius.md,
     padding: spacing.md,
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'hidden',
+    position: 'relative',
+  },
+  artGlowTop: {
+    position: 'absolute',
+    width: 170,
+    height: 170,
+    borderRadius: 999,
+    top: -60,
+    right: -40,
+  },
+  artGlowBottom: {
+    position: 'absolute',
+    width: 140,
+    height: 140,
+    borderRadius: 999,
+    bottom: -55,
+    left: -35,
   },
   artInnerFrame: {
     width: '100%',
     height: '100%',
     borderWidth: 1,
-    borderRadius: radius.xs,
+    borderRadius: radius.sm,
     padding: spacing.md,
     justifyContent: 'space-between',
     alignItems: 'center',
+  },
+  artCaptionPill: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: 4,
+    borderRadius: radius.pill,
+    backgroundColor: 'rgba(255,255,255,0.1)',
   },
   artCaption: {
     fontFamily: typography.serif,
@@ -330,10 +446,14 @@ const styles = StyleSheet.create({
     color: colors.muted,
     textAlign: 'center',
   },
+  artImageWrap: {
+    width: '100%',
+    borderRadius: radius.md,
+    overflow: 'hidden',
+    backgroundColor: colors.surfaceAlt,
+  },
   artImage: {
     width: '100%',
-    borderRadius: radius.xs,
-    backgroundColor: colors.surfaceAlt,
   },
   silWrap: {
     flex: 1,
@@ -341,53 +461,87 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     width: '100%',
   },
+  silHangerHook: {
+    width: 10,
+    height: 8,
+    borderWidth: 1.5,
+    borderBottomWidth: 0,
+    borderTopLeftRadius: 8,
+    borderTopRightRadius: 8,
+    marginBottom: 1,
+  },
   silCollar: {
-    width: 24,
+    width: 28,
     height: 10,
     borderWidth: 1.5,
     borderBottomWidth: 0,
+    borderTopLeftRadius: 8,
+    borderTopRightRadius: 8,
+  },
+  silShirtBody: {
+    width: 60,
+    height: 64,
+    borderWidth: 1.5,
+    borderRadius: 10,
+    padding: 10,
+    alignItems: 'flex-end',
+  },
+  silPocket: {
+    width: 14,
+    height: 15,
+    borderWidth: 1,
+    borderRadius: 3,
+    marginTop: 6,
+  },
+  silCoatBody: {
+    width: 66,
+    height: 74,
+    borderWidth: 1.5,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  silSeamCenter: {
+    width: 1,
+    height: '78%',
+  },
+  silWaist: {
+    width: 50,
+    height: 12,
+    borderWidth: 1.5,
     borderTopLeftRadius: 4,
     borderTopRightRadius: 4,
   },
-  silShirtBody: {
-    width: 56,
-    height: 64,
-    borderWidth: 1.5,
-    borderRadius: 2,
-  },
-  silCoatBody: {
-    width: 62,
-    height: 74,
-    borderWidth: 1.5,
-    borderRadius: 2,
-  },
-  silWaist: {
-    width: 48,
-    height: 12,
-    borderWidth: 1.5,
-  },
   silLegs: {
     flexDirection: 'row',
-    gap: 4,
+    gap: 5,
   },
   silLeg: {
     width: 22,
     height: 62,
     borderWidth: 1.5,
     borderTopWidth: 0,
+    borderBottomLeftRadius: 5,
+    borderBottomRightRadius: 5,
   },
   stateCard: {
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.sm,
+    borderRadius: radius.lg,
     padding: spacing.xl,
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.xs,
   },
+  loadingWrap: {
+    width: '100%',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.xs,
+  },
   stateCardError: {
-    borderColor: '#EABEC4',
+    borderColor: '#F0C5CD',
     backgroundColor: colors.dangerSoft,
   },
   stateTitle: {
@@ -403,7 +557,7 @@ const styles = StyleSheet.create({
     color: colors.muted,
     textAlign: 'center',
     maxWidth: 420,
-    lineHeight: 19,
+    lineHeight: 20,
   },
   fieldGroup: {
     gap: spacing.xs,
@@ -416,16 +570,20 @@ const styles = StyleSheet.create({
     color: colors.ink,
   },
   input: {
-    minHeight: 42,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-    borderRadius: radius.xs,
-    paddingHorizontal: spacing.md,
+    minHeight: 46,
+    backgroundColor: colors.surfaceSoft,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
     fontFamily: typography.sans,
     fontSize: 14,
     color: colors.ink,
+  },
+  inputFocused: {
+    borderColor: colors.accent,
+    backgroundColor: colors.surface,
   },
   inputError: {
     borderColor: colors.danger,

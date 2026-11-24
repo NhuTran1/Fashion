@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { fashionApi } from '../../api/client';
+import { FadeSlideIn } from '../../components/Motion';
 import {
   EditorialButton,
   GarmentArtwork,
@@ -8,11 +9,18 @@ import {
   StatusBadge,
 } from '../../components/UiPrimitives';
 import { useApp } from '../../state/AppContext';
-import { colors, radius, resolveColorSwatch, spacing, typography } from '../../theme/tokens';
+import {
+  colors,
+  radius,
+  resolveColorSwatch,
+  shadows,
+  spacing,
+  typography,
+} from '../../theme/tokens';
 import { ApiClientError, EntityId, Product, Review, Variant } from '../../types/api';
 import { formatDateTime, formatVnd } from '../../utils/format';
 
-/** Product detail screen handling getProduct, listProductReviews, and addCartItem (M1-09). */
+/** Product detail screen with rounded gallery thumbnails, tactile pill selectors, and smooth reveals. */
 export function ProductDetailScreen({ productId }: { productId: EntityId }): React.ReactElement {
   const { user, navigate, goBack, refreshCart, handleApiError, showToast } = useApp();
   const { width } = useWindowDimensions();
@@ -126,7 +134,10 @@ export function ProductDetailScreen({ productId }: { productId: EntityId }): Rea
     try {
       await fashionApi.addCartItem({ variantId: selectedVariant.id, quantity });
       await refreshCart();
-      showToast('success', `Đã thêm ${quantity} × ${product?.name} (${selectedVariant.size}/${selectedVariant.color}) vào giỏ.`);
+      showToast(
+        'success',
+        `Đã thêm ${quantity} × ${product?.name} (${selectedVariant.size}/${selectedVariant.color}) vào giỏ.`,
+      );
     } catch (err) {
       const msg = handleApiError(err, 'Không thể thêm vào giỏ hàng.');
       setCartActionError(msg);
@@ -170,240 +181,246 @@ export function ProductDetailScreen({ productId }: { productId: EntityId }): Rea
         <EditorialButton label="Quay lại" variant="secondary" compact onPress={goBack} />
       </View>
 
-      <View style={[styles.detailLayout, isWide && styles.detailLayoutWide]}>
-        {/* Left column: Image gallery */}
-        <View style={[styles.galleryCol, isWide && { flex: 1 }]}>
-          <GarmentArtwork
-            uri={activeImage?.url}
-            altText={activeImage?.altText || product.name}
-            height={isWide ? 400 : 290}
-          />
-          {product.images.length > 1 ? (
-            <View style={styles.thumbRow}>
-              {product.images.map((img, idx) => (
-                <Pressable
-                  key={img.id}
-                  onPress={() => setActiveImageIdx(idx)}
-                  style={[styles.thumbBox, idx === activeImageIdx && styles.thumbBoxActive]}
-                >
-                  <GarmentArtwork uri={img.url} altText={img.altText} height={58} />
-                </Pressable>
-              ))}
-            </View>
-          ) : null}
-        </View>
-
-        {/* Right column: Variant matrix, stock, CTA, honest AI feature flag notice */}
-        <View style={[styles.infoCol, isWide && { flex: 1.1 }]}>
-          <Text style={styles.productTitle}>{product.name}</Text>
-          <View style={styles.priceRow}>
-            <Text style={styles.priceText}>
-              {selectedVariant ? formatVnd(selectedVariant.price) : 'Chọn biến thể'}
-            </Text>
-            {selectedVariant ? (
-              <StatusBadge
-                label={
-                  selectedVariant.stockQuantity > 0
-                    ? `Còn ${selectedVariant.stockQuantity} · SKU ${selectedVariant.sku}`
-                    : `Hết hàng · SKU ${selectedVariant.sku}`
-                }
-                tone={selectedVariant.stockQuantity > 0 ? 'success' : 'danger'}
+      <FadeSlideIn distance={14}>
+        <View style={[styles.detailLayout, shadows.card, isWide && styles.detailLayoutWide]}>
+          {/* Left column: Image gallery */}
+          <View style={[styles.galleryCol, isWide && { flex: 1 }]}>
+            <View style={shadows.soft}>
+              <GarmentArtwork
+                uri={activeImage?.url}
+                altText={activeImage?.altText || product.name}
+                height={isWide ? 400 : 290}
               />
-            ) : (
-              <StatusBadge label="Tổ hợp size/màu chưa có" tone="warning" />
-            )}
-          </View>
-
-          <Text style={styles.description}>{product.description}</Text>
-
-          <View style={styles.selectorBlock}>
-            <Text style={styles.selectorLabel}>Kích cỡ</Text>
-            <View style={styles.optionRow}>
-              {sizes.map((sz) => {
-                const active = selectedSize === sz;
-                const available = isSizeAvailable(sz);
-                return (
+            </View>
+            {product.images.length > 1 ? (
+              <View style={styles.thumbRow}>
+                {product.images.map((img, idx) => (
                   <Pressable
-                    key={sz}
-                    onPress={() => {
-                      setSelectedSize(sz);
-                      const directMatch = product.variants.find(
-                        (v) => v.size === sz && v.color === selectedColor,
-                      );
-                      if (!directMatch) {
-                        const fallback = product.variants.find((v) => v.size === sz);
-                        if (fallback) setSelectedColor(fallback.color);
-                      }
-                      setQuantity(1);
-                    }}
-                    style={[
-                      styles.optionBtn,
-                      active && styles.optionBtnActive,
-                      !available && styles.optionBtnOos,
-                    ]}
+                    key={img.id}
+                    onPress={() => setActiveImageIdx(idx)}
+                    style={[styles.thumbBox, idx === activeImageIdx && styles.thumbBoxActive]}
                   >
-                    <Text
-                      style={[
-                        styles.optionText,
-                        active && styles.optionTextActive,
-                        !available && styles.optionTextOos,
-                      ]}
-                    >
-                      {sz}
-                    </Text>
+                    <GarmentArtwork uri={img.url} altText={img.altText} height={58} hideCaption />
                   </Pressable>
-                );
-              })}
-            </View>
-          </View>
-
-          <View style={styles.selectorBlock}>
-            <Text style={styles.selectorLabel}>Màu sắc</Text>
-            <View style={styles.optionRow}>
-              {colorList.map((clr) => {
-                const active = selectedColor === clr;
-                const exists = product.variants.some(
-                  (v) => v.size === selectedSize && v.color === clr,
-                );
-                const available = isColorAvailableForSize(clr);
-                return (
-                  <Pressable
-                    key={clr}
-                    disabled={!exists}
-                    onPress={() => {
-                      setSelectedColor(clr);
-                      setQuantity(1);
-                    }}
-                    style={[
-                      styles.optionBtn,
-                      styles.colorOptionBtn,
-                      active && styles.optionBtnActive,
-                      (!exists || !available) && styles.optionBtnOos,
-                    ]}
-                  >
-                    <View
-                      style={[
-                        styles.swatchDot,
-                        { backgroundColor: resolveColorSwatch(clr) },
-                      ]}
-                    />
-                    <Text
-                      style={[
-                        styles.optionText,
-                        active && styles.optionTextActive,
-                        (!exists || !available) && styles.optionTextOos,
-                      ]}
-                    >
-                      {clr}
-                      {!available && exists ? ' (Hết)' : ''}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          </View>
-
-          <View style={styles.qtyRow}>
-            <Text style={styles.selectorLabel}>Số lượng</Text>
-            <View style={styles.stepper}>
-              <Pressable
-                onPress={() => setQuantity((q) => Math.max(1, q - 1))}
-                style={styles.stepBtn}
-              >
-                <Text style={styles.stepText}>-</Text>
-              </Pressable>
-              <Text style={styles.qtyValue}>{quantity}</Text>
-              <Pressable
-                onPress={() =>
-                  setQuantity((q) =>
-                    Math.min(Math.max(1, selectedVariant?.stockQuantity ?? 1), q + 1),
-                  )
-                }
-                style={styles.stepBtn}
-              >
-                <Text style={styles.stepText}>+</Text>
-              </Pressable>
-            </View>
-          </View>
-
-          {cartActionError ? (
-            <View style={styles.inlineError}>
-              <Text style={styles.inlineErrorText}>{cartActionError}</Text>
-            </View>
-          ) : null}
-
-          <View style={styles.ctaGroup}>
-            <EditorialButton
-              label={
-                !user
-                  ? 'Đăng nhập để thêm vào giỏ'
-                  : outOfStock
-                    ? 'Biến thể hết hàng'
-                    : 'Thêm vào giỏ hàng'
-              }
-              onPress={() => void handleAddToCart()}
-              loading={addingToCart}
-              disabled={Boolean(user && outOfStock)}
-            />
-            {user?.role === 'CUSTOMER' ? (
-              <EditorialButton
-                label="Mở giỏ hàng"
-                variant="secondary"
-                onPress={() => navigate({ name: 'cart' })}
-              />
+                ))}
+              </View>
             ) : null}
           </View>
 
-          {/* AC-14: AI Try-On isolated & honestly disabled when TRYON_ENABLED=false */}
-          <View style={styles.aiNotice}>
-            <Text style={styles.aiNoticeTitle}>Thử đồ AI bằng ảnh (Sắp ra mắt)</Text>
-            <Text style={styles.aiNoticeBody}>
-              Tính năng AI Try-On đang tắt (TRYON_ENABLED=false). Luồng chọn size và đặt hàng COD
-              hoạt động độc lập, không phụ thuộc dịch vụ AI.
-            </Text>
+          {/* Right column: Variant matrix, stock, CTA, honest AI feature flag notice */}
+          <View style={[styles.infoCol, isWide && { flex: 1.1 }]}>
+            <Text style={styles.productTitle}>{product.name}</Text>
+            <View style={styles.priceRow}>
+              <Text style={styles.priceText}>
+                {selectedVariant ? formatVnd(selectedVariant.price) : 'Chọn biến thể'}
+              </Text>
+              {selectedVariant ? (
+                <StatusBadge
+                  label={
+                    selectedVariant.stockQuantity > 0
+                      ? `Còn ${selectedVariant.stockQuantity} · SKU ${selectedVariant.sku}`
+                      : `Hết hàng · SKU ${selectedVariant.sku}`
+                  }
+                  tone={selectedVariant.stockQuantity > 0 ? 'success' : 'danger'}
+                />
+              ) : (
+                <StatusBadge label="Tổ hợp size/màu chưa có" tone="warning" />
+              )}
+            </View>
+
+            <Text style={styles.description}>{product.description}</Text>
+
+            <View style={styles.selectorBlock}>
+              <Text style={styles.selectorLabel}>Kích cỡ</Text>
+              <View style={styles.optionRow}>
+                {sizes.map((sz) => {
+                  const active = selectedSize === sz;
+                  const available = isSizeAvailable(sz);
+                  return (
+                    <Pressable
+                      key={sz}
+                      onPress={() => {
+                        setSelectedSize(sz);
+                        const directMatch = product.variants.find(
+                          (v) => v.size === sz && v.color === selectedColor,
+                        );
+                        if (!directMatch) {
+                          const fallback = product.variants.find((v) => v.size === sz);
+                          if (fallback) setSelectedColor(fallback.color);
+                        }
+                        setQuantity(1);
+                      }}
+                      style={[
+                        styles.optionBtn,
+                        active && styles.optionBtnActive,
+                        !available && styles.optionBtnOos,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.optionText,
+                          active && styles.optionTextActive,
+                          !available && styles.optionTextOos,
+                        ]}
+                      >
+                        {sz}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+
+            <View style={styles.selectorBlock}>
+              <Text style={styles.selectorLabel}>Màu sắc</Text>
+              <View style={styles.optionRow}>
+                {colorList.map((clr) => {
+                  const active = selectedColor === clr;
+                  const exists = product.variants.some(
+                    (v) => v.size === selectedSize && v.color === clr,
+                  );
+                  const available = isColorAvailableForSize(clr);
+                  return (
+                    <Pressable
+                      key={clr}
+                      disabled={!exists}
+                      onPress={() => {
+                        setSelectedColor(clr);
+                        setQuantity(1);
+                      }}
+                      style={[
+                        styles.optionBtn,
+                        styles.colorOptionBtn,
+                        active && styles.optionBtnActive,
+                        (!exists || !available) && styles.optionBtnOos,
+                      ]}
+                    >
+                      <View
+                        style={[
+                          styles.swatchDot,
+                          { backgroundColor: resolveColorSwatch(clr) },
+                        ]}
+                      />
+                      <Text
+                        style={[
+                          styles.optionText,
+                          active && styles.optionTextActive,
+                          (!exists || !available) && styles.optionTextOos,
+                        ]}
+                      >
+                        {clr}
+                        {!available && exists ? ' (Hết)' : ''}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+
+            <View style={styles.qtyRow}>
+              <Text style={styles.selectorLabel}>Số lượng</Text>
+              <View style={styles.stepper}>
+                <Pressable
+                  onPress={() => setQuantity((q) => Math.max(1, q - 1))}
+                  style={styles.stepBtn}
+                >
+                  <Text style={styles.stepText}>-</Text>
+                </Pressable>
+                <Text style={styles.qtyValue}>{quantity}</Text>
+                <Pressable
+                  onPress={() =>
+                    setQuantity((q) =>
+                      Math.min(Math.max(1, selectedVariant?.stockQuantity ?? 1), q + 1),
+                    )
+                  }
+                  style={styles.stepBtn}
+                >
+                  <Text style={styles.stepText}>+</Text>
+                </Pressable>
+              </View>
+            </View>
+
+            {cartActionError ? (
+              <View style={styles.inlineError}>
+                <Text style={styles.inlineErrorText}>{cartActionError}</Text>
+              </View>
+            ) : null}
+
+            <View style={styles.ctaGroup}>
+              <EditorialButton
+                label={
+                  !user
+                    ? 'Đăng nhập để thêm vào giỏ'
+                    : outOfStock
+                      ? 'Biến thể hết hàng'
+                      : 'Thêm vào giỏ hàng'
+                }
+                onPress={() => void handleAddToCart()}
+                loading={addingToCart}
+                disabled={Boolean(user && outOfStock)}
+              />
+              {user?.role === 'CUSTOMER' ? (
+                <EditorialButton
+                  label="Mở giỏ hàng"
+                  variant="secondary"
+                  onPress={() => navigate({ name: 'cart' })}
+                />
+              ) : null}
+            </View>
+
+            {/* AC-14: AI Try-On isolated & honestly disabled when TRYON_ENABLED=false */}
+            <View style={styles.aiNotice}>
+              <Text style={styles.aiNoticeTitle}>Thử đồ AI bằng ảnh (Sắp ra mắt)</Text>
+              <Text style={styles.aiNoticeBody}>
+                Tính năng AI Try-On đang tắt (TRYON_ENABLED=false). Luồng chọn size và đặt hàng COD
+                hoạt động độc lập, không phụ thuộc dịch vụ AI.
+              </Text>
+            </View>
           </View>
         </View>
-      </View>
+      </FadeSlideIn>
 
       {/* Independent Reviews Panel */}
-      <View style={styles.reviewsPanel}>
-        <View style={styles.reviewsHeader}>
-          <Text style={styles.sectionTitle}>Đánh giá từ khách đã mua ({reviewsTotal})</Text>
-        </View>
-
-        {reviewsLoading ? (
-          <StateCard kind="loading" title="Đang tải đánh giá sản phẩm..." />
-        ) : reviewsError ? (
-          <StateCard
-            kind="error"
-            title="Lỗi tải đánh giá"
-            message={reviewsError}
-            actionLabel="Thử lại"
-            onAction={() => void loadReviews()}
-          />
-        ) : reviews.length === 0 ? (
-          <StateCard
-            kind="empty"
-            title="Chưa có đánh giá công khai"
-            message="Khách hàng sau khi nhận đơn thành công có thể gửi đánh giá 1–5 sao tại chi tiết đơn hàng."
-          />
-        ) : (
-          <View style={styles.reviewList}>
-            {reviews.map((rev) => (
-              <View key={rev.id} style={styles.reviewItem}>
-                <View style={styles.reviewTop}>
-                  <Text style={styles.reviewStars}>
-                    {'★'.repeat(rev.rating)}
-                    {'☆'.repeat(5 - rev.rating)} ({rev.rating}/5)
-                  </Text>
-                  <Text style={styles.reviewDate}>{formatDateTime(rev.createdAt)}</Text>
-                </View>
-                <Text style={styles.reviewContent}>{rev.content}</Text>
-              </View>
-            ))}
+      <FadeSlideIn delay={90} distance={14}>
+        <View style={[styles.reviewsPanel, shadows.card]}>
+          <View style={styles.reviewsHeader}>
+            <Text style={styles.sectionTitle}>Đánh giá từ khách đã mua ({reviewsTotal})</Text>
           </View>
-        )}
-      </View>
+
+          {reviewsLoading ? (
+            <StateCard kind="loading" title="Đang tải đánh giá sản phẩm..." />
+          ) : reviewsError ? (
+            <StateCard
+              kind="error"
+              title="Lỗi tải đánh giá"
+              message={reviewsError}
+              actionLabel="Thử lại"
+              onAction={() => void loadReviews()}
+            />
+          ) : reviews.length === 0 ? (
+            <StateCard
+              kind="empty"
+              title="Chưa có đánh giá công khai"
+              message="Khách hàng sau khi nhận đơn thành công có thể gửi đánh giá 1–5 sao tại chi tiết đơn hàng."
+            />
+          ) : (
+            <View style={styles.reviewList}>
+              {reviews.map((rev) => (
+                <View key={rev.id} style={styles.reviewItem}>
+                  <View style={styles.reviewTop}>
+                    <Text style={styles.reviewStars}>
+                      {'★'.repeat(rev.rating)}
+                      {'☆'.repeat(5 - rev.rating)} ({rev.rating}/5)
+                    </Text>
+                    <Text style={styles.reviewDate}>{formatDateTime(rev.createdAt)}</Text>
+                  </View>
+                  <Text style={styles.reviewContent}>{rev.content}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+      </FadeSlideIn>
     </ScrollView>
   );
 }
@@ -424,7 +441,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.sm,
+    borderRadius: radius.lg,
     padding: spacing.xl,
     gap: spacing.xl,
   },
@@ -435,18 +452,18 @@ const styles = StyleSheet.create({
   galleryCol: { gap: spacing.md },
   thumbRow: { flexDirection: 'row', gap: spacing.sm },
   thumbBox: {
-    width: 72,
-    borderWidth: 1,
+    width: 76,
+    borderWidth: 1.5,
     borderColor: colors.border,
-    borderRadius: radius.xs,
-    padding: 2,
+    borderRadius: radius.md,
+    padding: 3,
   },
   thumbBoxActive: { borderColor: colors.accent, borderWidth: 2 },
   infoCol: { gap: spacing.md },
   productTitle: {
     fontFamily: typography.serif,
-    fontSize: 26,
-    lineHeight: 33,
+    fontSize: 27,
+    lineHeight: 34,
     color: colors.ink,
   },
   priceRow: {
@@ -478,12 +495,12 @@ const styles = StyleSheet.create({
   },
   optionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   optionBtn: {
-    minWidth: 48,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-    borderRadius: radius.xs,
+    minWidth: 50,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: 9,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    borderRadius: radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.surface,
@@ -495,8 +512,8 @@ const styles = StyleSheet.create({
   optionTextActive: { color: colors.accent, fontWeight: '700' },
   optionTextOos: { color: colors.muted, textDecorationLine: 'line-through' },
   swatchDot: {
-    width: 10,
-    height: 10,
+    width: 11,
+    height: 11,
     borderRadius: 99,
     borderWidth: 1,
     borderColor: colors.borderStrong,
@@ -510,9 +527,11 @@ const styles = StyleSheet.create({
   stepper: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-    borderRadius: radius.xs,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceSoft,
+    paddingHorizontal: 4,
   },
   stepBtn: {
     width: 36,
@@ -533,19 +552,19 @@ const styles = StyleSheet.create({
   inlineError: {
     backgroundColor: colors.dangerSoft,
     borderWidth: 1,
-    borderColor: '#EABEC4',
+    borderColor: '#F0C5CD',
     padding: spacing.md,
-    borderRadius: radius.xs,
+    borderRadius: radius.sm,
   },
   inlineErrorText: { fontFamily: typography.sans, fontSize: 13, color: colors.danger },
   ctaGroup: { gap: spacing.sm, marginTop: spacing.xs },
   aiNotice: {
     marginTop: spacing.sm,
-    padding: spacing.md,
+    padding: spacing.lg,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.xs,
-    backgroundColor: colors.canvas,
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceSoft,
     gap: 4,
   },
   aiNoticeTitle: {
@@ -557,14 +576,14 @@ const styles = StyleSheet.create({
   aiNoticeBody: {
     fontFamily: typography.sans,
     fontSize: 12,
-    lineHeight: 18,
+    lineHeight: 19,
     color: colors.muted,
   },
   reviewsPanel: {
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.sm,
+    borderRadius: radius.lg,
     padding: spacing.xl,
     gap: spacing.md,
   },
@@ -572,10 +591,10 @@ const styles = StyleSheet.create({
   sectionTitle: { fontFamily: typography.serif, fontSize: 20, color: colors.ink },
   reviewList: { gap: spacing.md },
   reviewItem: {
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    paddingTop: spacing.md,
-    gap: 4,
+    backgroundColor: colors.surfaceSoft,
+    borderRadius: radius.md,
+    padding: spacing.lg,
+    gap: 6,
   },
   reviewTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   reviewStars: { fontFamily: typography.sans, fontSize: 13, fontWeight: '700', color: colors.accent },

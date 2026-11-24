@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { FadeSlideIn } from '../../components/Motion';
 import { EditorialButton, StateCard, StatusBadge } from '../../components/UiPrimitives';
 import { useApp } from '../../state/AppContext';
-import { colors, radius, spacing, typography } from '../../theme/tokens';
+import { colors, radius, shadows, spacing, typography } from '../../theme/tokens';
 import { AdminCatalogPanel } from './AdminCatalogPanel';
 import {
   AdminInventoryPanel,
@@ -14,10 +15,8 @@ import {
 type AdminTab = 'orders' | 'catalog' | 'inventory' | 'reviews' | 'users';
 
 /**
- * Web-first Admin & Staff Operations Workspace enforcing M1-10 authorization-aware routing:
- * - Unauthenticated -> redirects to login without fetching admin data.
- * - Customer -> renders explicit 403 Denied screen with route back to Storefront.
- * - Staff -> gates tabs according to granted RBAC permissions (docs/06-RBAC.md).
+ * Web-first Admin & Staff Operations Workspace with soft rounded panels,
+ * animated tab transitions, and M1-10 authorization-aware routing.
  */
 export function AdminWorkspaceScreen({
   initialTab = 'orders',
@@ -88,8 +87,8 @@ export function AdminWorkspaceScreen({
 
   return (
     <View style={[styles.shell, isWide && styles.shellWide]}>
-      {/* Left rail on wide screens / horizontal tabs on narrow screens */}
-      <View style={[styles.rail, isWide && styles.railWide]}>
+      {/* Soft elevated left rail on wide screens / pill tabs on compact screens */}
+      <View style={[styles.rail, shadows.card, isWide && styles.railWide]}>
         <View style={styles.railHeader}>
           <Text style={styles.railTitle}>Quản trị cửa hàng</Text>
           <StatusBadge
@@ -104,7 +103,11 @@ export function AdminWorkspaceScreen({
               <Pressable
                 key={t.id}
                 onPress={() => setActiveTab(t.id)}
-                style={[styles.navItem, active && styles.navItemActive, !t.allowed && { opacity: 0.65 }]}
+                style={[
+                  styles.navItem,
+                  active && styles.navItemActive,
+                  !t.allowed && { opacity: 0.65 },
+                ]}
               >
                 <Text style={[styles.navText, active && styles.navTextActive]}>
                   {t.label}
@@ -123,11 +126,13 @@ export function AdminWorkspaceScreen({
       </View>
 
       <ScrollView style={styles.main} contentContainerStyle={styles.mainContent}>
-        {activeTab === 'orders' ? <AdminOrdersPanel /> : null}
-        {activeTab === 'catalog' ? <AdminCatalogPanel /> : null}
-        {activeTab === 'inventory' ? <AdminInventoryPanel /> : null}
-        {activeTab === 'reviews' ? <AdminReviewsPanel /> : null}
-        {activeTab === 'users' ? <AdminUsersPanel /> : null}
+        <FadeSlideIn key={activeTab} distance={10} duration={240}>
+          {activeTab === 'orders' ? <AdminOrdersPanel /> : null}
+          {activeTab === 'catalog' ? <AdminCatalogPanel /> : null}
+          {activeTab === 'inventory' ? <AdminInventoryPanel /> : null}
+          {activeTab === 'reviews' ? <AdminReviewsPanel /> : null}
+          {activeTab === 'users' ? <AdminUsersPanel /> : null}
+        </FadeSlideIn>
       </ScrollView>
     </View>
   );
@@ -162,26 +167,26 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   railWide: {
-    width: 240,
+    width: 250,
     borderWidth: 1,
-    borderRadius: radius.sm,
+    borderRadius: radius.lg,
     alignSelf: 'flex-start',
     padding: spacing.lg,
   },
   railHeader: { gap: spacing.xs },
-  railTitle: { fontFamily: typography.serif, fontSize: 18, color: colors.ink },
+  railTitle: { fontFamily: typography.serif, fontSize: 19, color: colors.ink },
   tabCol: { gap: spacing.xs },
   tabRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   navItem: {
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: radius.xs,
+    paddingVertical: 10,
+    borderRadius: radius.pill,
     borderWidth: 1,
     borderColor: colors.border,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceSoft,
   },
   navItemActive: {
-    borderColor: colors.accent,
+    borderColor: '#C9D8EC',
     backgroundColor: colors.accentSoft,
   },
   navText: { fontFamily: typography.sans, fontSize: 13, color: colors.ink },

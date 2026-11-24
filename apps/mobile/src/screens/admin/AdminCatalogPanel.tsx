@@ -10,7 +10,7 @@ import {
 } from '../../components/UiPrimitives';
 import { mockServer } from '../../mock/mockServer';
 import { useApp } from '../../state/AppContext';
-import { colors, radius, spacing, typography } from '../../theme/tokens';
+import { colors, radius, shadows, spacing, typography } from '../../theme/tokens';
 import { CatalogStatus, Category, EntityId, Product, ProductImage, Variant } from '../../types/api';
 import { formatVnd } from '../../utils/format';
 
@@ -248,7 +248,7 @@ export function AdminCatalogPanel(): React.ReactElement {
   return (
     <View style={styles.stack}>
       {/* Categories Section */}
-      <View style={styles.panel}>
+      <View style={[styles.panel, shadows.card]}>
         <Text style={styles.panelTitle}>Danh mục sản phẩm ({categories.length})</Text>
         <View style={styles.rowWrap}>
           {categories.map((c) => (
@@ -310,38 +310,39 @@ export function AdminCatalogPanel(): React.ReactElement {
       </View>
 
       {/* Products Table + Creation */}
-      <View style={styles.panel}>
+      <View style={[styles.panel, shadows.card]}>
         <Text style={styles.panelTitle}>Sản phẩm ({products.length})</Text>
         <View style={styles.listStack}>
           {products.map((p) => {
             const selected = p.id === selectedProductId;
             return (
-              <Pressable
+              <View
                 key={p.id}
-                onPress={() => setSelectedProductId(p.id)}
                 style={[styles.productRow, selected && styles.productRowActive]}
               >
-                <View style={{ flex: 1, gap: 2 }}>
-                  <Text style={styles.boldText}>
-                    #{p.id} · {p.name}
-                  </Text>
-                  <Text style={styles.mutedText}>
-                    Slug: {p.slug} · {p.variants.length} biến thể · {p.images.length} ảnh
-                  </Text>
-                </View>
-                <StatusBadge
-                  label={p.status}
-                  tone={p.status === 'ACTIVE' ? 'success' : 'warning'}
-                />
-                {isAdmin ? (
-                  <EditorialButton
-                    label={p.status === 'ACTIVE' ? 'Ẩn' : 'Xuất bản'}
-                    variant="secondary"
-                    compact
-                    onPress={() => void handleToggleProductStatus(p)}
+                <View style={styles.rowInner}>
+                  <Pressable onPress={() => setSelectedProductId(p.id)} style={{ flex: 1, gap: 2 }}>
+                    <Text style={styles.boldText}>
+                      #{p.id} · {p.name}
+                    </Text>
+                    <Text style={styles.mutedText}>
+                      Slug: {p.slug} · {p.variants.length} biến thể · {p.images.length} ảnh
+                    </Text>
+                  </Pressable>
+                  <StatusBadge
+                    label={p.status}
+                    tone={p.status === 'ACTIVE' ? 'success' : 'warning'}
                   />
-                ) : null}
-              </Pressable>
+                  {isAdmin ? (
+                    <EditorialButton
+                      label={p.status === 'ACTIVE' ? 'Ẩn' : 'Xuất bản'}
+                      variant="secondary"
+                      compact
+                      onPress={() => void handleToggleProductStatus(p)}
+                    />
+                  ) : null}
+                </View>
+              </View>
             );
           })}
         </View>
@@ -402,7 +403,7 @@ export function AdminCatalogPanel(): React.ReactElement {
 
       {/* Selected Product Variants, Description & storageKey Images */}
       {selectedProduct ? (
-        <View style={styles.panel}>
+        <View style={[styles.panel, shadows.card]}>
           <Text style={styles.panelTitle}>
             Chi tiết biến thể & Ảnh: {selectedProduct.name}
           </Text>
@@ -565,11 +566,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.sm,
-    padding: spacing.lg,
+    borderRadius: radius.lg,
+    padding: spacing.xl,
     gap: spacing.md,
   },
-  panelTitle: { fontFamily: typography.serif, fontSize: 19, color: colors.ink },
+  panelTitle: { fontFamily: typography.serif, fontSize: 20, color: colors.ink },
   subTitle: { fontFamily: typography.sans, fontSize: 14, fontWeight: '700', color: colors.ink },
   rowWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, alignItems: 'center' },
   tagItem: {
@@ -578,9 +579,10 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.xs,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceSoft,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 5,
   },
   tagText: { fontFamily: typography.sans, fontSize: 12, color: colors.ink },
   inlineForm: {
@@ -594,21 +596,25 @@ const styles = StyleSheet.create({
   productRow: {
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.xs,
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceSoft,
     padding: spacing.md,
+  },
+  productRowActive: { borderColor: colors.accent, backgroundColor: colors.accentSoft },
+  rowInner: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
   },
-  productRowActive: { borderColor: colors.accent, backgroundColor: colors.accentSoft },
   boldText: { fontFamily: typography.sans, fontSize: 14, fontWeight: '600', color: colors.ink },
   mutedText: { fontFamily: typography.sans, fontSize: 12, color: colors.muted },
   miniChip: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 5,
     borderWidth: 1,
     borderColor: colors.borderStrong,
-    borderRadius: radius.xs,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surface,
   },
   miniChipActive: { borderColor: colors.accent, backgroundColor: colors.accentSoft },
   miniChipText: { fontFamily: typography.sans, fontSize: 12, color: colors.ink },
@@ -619,15 +625,17 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.xs,
-    padding: spacing.sm,
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceSoft,
+    padding: spacing.md,
   },
   imgCard: {
-    width: 140,
+    width: 148,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.xs,
-    padding: spacing.xs,
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceSoft,
+    padding: spacing.sm,
     gap: 4,
   },
 });

@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { FadeSlideIn } from '../../components/Motion';
 import { EditorialButton, FieldInput, StatusBadge } from '../../components/UiPrimitives';
 import { DEMO_ACCOUNTS } from '../../mock/seedData';
 import { useApp } from '../../state/AppContext';
-import { colors, radius, spacing, typography } from '../../theme/tokens';
+import { colors, radius, shadows, spacing, typography } from '../../theme/tokens';
 
-/** Login & Public Customer Registration screen adhering to ADR-0003 & M1-09. */
+/** Soft-curved Login & Public Customer Registration screen adhering to ADR-0003 & M1-09. */
 export function AuthScreen({ initialMode = 'login' }: { initialMode?: 'login' | 'register' }): React.ReactElement {
   const { login, register, handleApiError, showToast } = useApp();
 
@@ -65,107 +66,119 @@ export function AuthScreen({ initialMode = 'login' }: { initialMode?: 'login' | 
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <View style={styles.card}>
-        <View style={styles.tabRow}>
-          <Pressable
-            onPress={() => {
-              setMode('login');
-              setFormError(null);
-            }}
-            style={[styles.tabBtn, mode === 'login' && styles.tabBtnActive]}
-          >
-            <Text style={[styles.tabText, mode === 'login' && styles.tabTextActive]}>
-              Đăng nhập
-            </Text>
-          </Pressable>
-          <Pressable
-            onPress={() => {
-              setMode('register');
-              setFormError(null);
-            }}
-            style={[styles.tabBtn, mode === 'register' && styles.tabBtnActive]}
-          >
-            <Text style={[styles.tabText, mode === 'register' && styles.tabTextActive]}>
-              Đăng ký Customer
-            </Text>
-          </Pressable>
-        </View>
-
-        <Text style={styles.title}>
-          {mode === 'login' ? 'Truy cập tài khoản SỞI Atelier' : 'Tạo tài khoản mua sắm'}
-        </Text>
-        <Text style={styles.subtitle}>
-          {mode === 'login'
-            ? Platform.OS === 'web'
-              ? 'Phiên Web dùng cookie bảo mật kèm CSRF token (ADR-0003).'
-              : 'Phiên Android dùng opaque bearer token lưu trong SecureStore (ADR-0003).'
-            : 'Đăng ký công khai chỉ tạo vai trò Customer. Tài khoản Admin/Staff được cấp nội bộ.'}
-        </Text>
-
-        {formError ? (
-          <View style={styles.errorBox}>
-            <Text style={styles.errorText}>{formError}</Text>
+      <FadeSlideIn distance={14}>
+        <View style={[styles.card, shadows.card]}>
+          <View style={styles.tabTrack}>
+            <Pressable
+              onPress={() => {
+                setMode('login');
+                setFormError(null);
+              }}
+              style={[styles.tabBtn, mode === 'login' && [styles.tabBtnActive, shadows.soft]]}
+            >
+              <Text style={[styles.tabText, mode === 'login' && styles.tabTextActive]}>
+                Đăng nhập
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => {
+                setMode('register');
+                setFormError(null);
+              }}
+              style={[styles.tabBtn, mode === 'register' && [styles.tabBtnActive, shadows.soft]]}
+            >
+              <Text style={[styles.tabText, mode === 'register' && styles.tabTextActive]}>
+                Đăng ký Customer
+              </Text>
+            </Pressable>
           </View>
-        ) : null}
 
-        <FieldInput
-          label="Email"
-          value={email}
-          onChangeText={setEmail}
-          autoCapitalize="none"
-          keyboardType="email-address"
-          placeholder="customer@example.test"
-          error={fieldErrors.email}
-        />
-        <FieldInput
-          label="Mật khẩu"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-          placeholder="••••••••"
-          error={fieldErrors.password}
-        />
+          <Text style={styles.title}>
+            {mode === 'login' ? 'Truy cập tài khoản SỞI Atelier' : 'Tạo tài khoản mua sắm'}
+          </Text>
+          <Text style={styles.subtitle}>
+            {mode === 'login'
+              ? Platform.OS === 'web'
+                ? 'Phiên Web dùng cookie bảo mật kèm CSRF token (ADR-0003).'
+                : 'Phiên Android dùng opaque bearer token lưu trong SecureStore (ADR-0003).'
+              : 'Đăng ký công khai chỉ tạo vai trò Customer. Tài khoản Admin/Staff được cấp nội bộ.'}
+          </Text>
 
-        <EditorialButton
-          label={mode === 'login' ? 'Đăng nhập' : 'Tạo tài khoản'}
-          onPress={() => void handleSubmit()}
-          loading={submitting}
-        />
-      </View>
+          {formError ? (
+            <View style={styles.errorBox}>
+              <Text style={styles.errorText}>{formError}</Text>
+            </View>
+          ) : null}
 
-      {/* Synthetic Demo Accounts for rapid QA across Customer / Admin / Staff */}
-      <View style={styles.demoCard}>
-        <Text style={styles.demoTitle}>Tài khoản mẫu kiểm thử (Synthetic Demo Data)</Text>
-        <Text style={styles.demoHint}>
-          Chọn nhanh một vai trò để kiểm thử luồng Customer, Admin MVP A hoặc Staff MVP B:
-        </Text>
-        <View style={styles.demoList}>
-          {DEMO_ACCOUNTS.map((acc) => (
-            <View key={acc.email} style={styles.demoItem}>
-              <View style={styles.demoInfo}>
-                <View style={styles.demoTop}>
-                  <Text style={styles.demoLabel}>{acc.label}</Text>
-                  <StatusBadge
-                    label={acc.role}
-                    tone={acc.role === 'ADMIN' ? 'accent' : acc.role === 'STAFF' ? 'warning' : 'success'}
+          <FieldInput
+            label="Email"
+            value={email}
+            onChangeText={setEmail}
+            autoCapitalize="none"
+            keyboardType="email-address"
+            placeholder="customer@example.test"
+            error={fieldErrors.email}
+          />
+          <FieldInput
+            label="Mật khẩu"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            placeholder="••••••••"
+            error={fieldErrors.password}
+          />
+
+          <EditorialButton
+            label={mode === 'login' ? 'Đăng nhập' : 'Tạo tài khoản'}
+            onPress={() => void handleSubmit()}
+            loading={submitting}
+          />
+        </View>
+      </FadeSlideIn>
+
+      {/* Interactive Demo Account Cards */}
+      <FadeSlideIn delay={80} distance={14}>
+        <View style={[styles.demoCard, shadows.card]}>
+          <Text style={styles.demoTitle}>Tài khoản mẫu kiểm thử (Synthetic Demo Data)</Text>
+          <Text style={styles.demoHint}>
+            Chọn nhanh một vai trò để kiểm thử luồng Customer, Admin MVP A hoặc Staff MVP B:
+          </Text>
+          <View style={styles.demoList}>
+            {DEMO_ACCOUNTS.map((acc) => (
+              <View key={acc.email} style={[styles.demoItem, shadows.soft]}>
+                <View style={styles.demoRowInner}>
+                  <View style={styles.demoInfo}>
+                    <View style={styles.demoTop}>
+                      <Text style={styles.demoLabel}>{acc.label}</Text>
+                      <StatusBadge
+                        label={acc.role}
+                        tone={
+                          acc.role === 'ADMIN'
+                            ? 'accent'
+                            : acc.role === 'STAFF'
+                              ? 'warning'
+                              : 'success'
+                        }
+                      />
+                    </View>
+                    <Text style={styles.demoCreds}>
+                      {acc.email} / {acc.password}
+                    </Text>
+                    <Text style={styles.demoNote}>{acc.note}</Text>
+                  </View>
+                  <EditorialButton
+                    label="Vào nhanh"
+                    variant="secondary"
+                    compact
+                    disabled={submitting}
+                    onPress={() => void handleQuickDemoLogin(acc.email, acc.password)}
                   />
                 </View>
-                <Text style={styles.demoCreds}>
-                  {acc.email} / {acc.password}
-                </Text>
-                <Text style={styles.demoNote}>{acc.note}</Text>
               </View>
-              <EditorialButton
-                label="Vào nhanh"
-                variant="secondary"
-                compact
-                disabled={submitting}
-                onPress={() => void handleQuickDemoLogin(acc.email, acc.password)}
-              />
-            </View>
-          ))}
+            ))}
+          </View>
         </View>
-      </View>
+      </FadeSlideIn>
     </ScrollView>
   );
 }
@@ -174,7 +187,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.canvas },
   content: {
     padding: spacing.lg,
-    maxWidth: 620,
+    maxWidth: 640,
     width: '100%',
     alignSelf: 'center',
     gap: spacing.lg,
@@ -184,41 +197,41 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.sm,
+    borderRadius: radius.lg,
     padding: spacing.xl,
     gap: spacing.md,
   },
-  tabRow: {
+  tabTrack: {
     flexDirection: 'row',
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.pill,
+    padding: 4,
     marginBottom: spacing.xs,
   },
   tabBtn: {
     flex: 1,
-    paddingVertical: spacing.md,
+    paddingVertical: 10,
     alignItems: 'center',
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent',
+    borderRadius: radius.pill,
   },
-  tabBtnActive: { borderBottomColor: colors.accent },
+  tabBtnActive: { backgroundColor: colors.surface },
   tabText: { fontFamily: typography.sans, fontSize: 14, color: colors.muted, fontWeight: '500' },
   tabTextActive: { color: colors.accent, fontWeight: '700' },
-  title: { fontFamily: typography.serif, fontSize: 22, color: colors.ink },
-  subtitle: { fontFamily: typography.sans, fontSize: 13, lineHeight: 19, color: colors.muted },
+  title: { fontFamily: typography.serif, fontSize: 23, color: colors.ink },
+  subtitle: { fontFamily: typography.sans, fontSize: 13, lineHeight: 20, color: colors.muted },
   errorBox: {
     backgroundColor: colors.dangerSoft,
     borderWidth: 1,
-    borderColor: '#EABEC4',
+    borderColor: '#F0C5CD',
     padding: spacing.md,
-    borderRadius: radius.xs,
+    borderRadius: radius.sm,
   },
   errorText: { fontFamily: typography.sans, fontSize: 13, color: colors.danger },
   demoCard: {
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.sm,
+    borderRadius: radius.lg,
     padding: spacing.xl,
     gap: spacing.sm,
   },
@@ -228,8 +241,11 @@ const styles = StyleSheet.create({
   demoItem: {
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.xs,
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceSoft,
     padding: spacing.md,
+  },
+  demoRowInner: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',

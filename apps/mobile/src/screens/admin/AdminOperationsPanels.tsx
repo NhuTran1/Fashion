@@ -1,6 +1,7 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { fashionApi } from '../../api/client';
+import { AnimatedProgressTrack, InteractiveCard } from '../../components/Motion';
 import {
   EditorialButton,
   FieldInput,
@@ -9,7 +10,7 @@ import {
 } from '../../components/UiPrimitives';
 import { ALL_STAFF_PERMISSIONS } from '../../mock/seedData';
 import { useApp } from '../../state/AppContext';
-import { colors, radius, spacing, typography } from '../../theme/tokens';
+import { colors, radius, shadows, spacing, typography } from '../../theme/tokens';
 import {
   AdminAuditLog,
   AdminReview,
@@ -29,6 +30,8 @@ import {
   getPaymentStatusLabel,
 } from '../../utils/format';
 
+const ORDER_STEPS: OrderStatus[] = ['PENDING', 'CONFIRMED', 'PACKING', 'SHIPPING', 'DELIVERED'];
+
 /** Admin/Staff inventory panel supporting adjustInventory and listInventoryAdjustments (M1-10). */
 export function AdminInventoryPanel(): React.ReactElement {
   const { handleApiError, showToast } = useApp();
@@ -38,6 +41,7 @@ export function AdminInventoryPanel(): React.ReactElement {
     productName: string;
     variant: Variant;
   } | null>(null);
+  const selectedVariantIdRef = useRef<EntityId | null>(null);
   const [history, setHistory] = useState<InventoryMovementHistory[]>([]);
   const [loading, setLoading] = useState(true);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -56,15 +60,17 @@ export function AdminInventoryPanel(): React.ReactElement {
     try {
       const page = await fashionApi.listAdminProducts(1, 50);
       setProducts(page.items);
-      if (selectedVariant) {
+      const currentId = selectedVariantIdRef.current;
+      if (currentId) {
         for (const p of page.items) {
-          const found = p.variants.find((v) => v.id === selectedVariant.variant.id);
+          const found = p.variants.find((v) => v.id === currentId);
           if (found) {
             setSelectedVariant({ productName: p.name, variant: found });
             break;
           }
         }
       } else if (page.items[0]?.variants[0]) {
+        selectedVariantIdRef.current = page.items[0].variants[0].id;
         setSelectedVariant({ productName: page.items[0].name, variant: page.items[0].variants[0] });
       }
     } catch (err) {
@@ -72,7 +78,7 @@ export function AdminInventoryPanel(): React.ReactElement {
     } finally {
       setLoading(false);
     }
-  }, [handleApiError, selectedVariant]);
+  }, [handleApiError]);
 
   /** Load movement audit history for the selected variant ID. */
   const loadHistory = useCallback(
@@ -143,34 +149,37 @@ export function AdminInventoryPanel(): React.ReactElement {
 
   return (
     <View style={styles.stack}>
-      <View style={styles.panel}>
+      <View style={[styles.panel, shadows.card]}>
         <Text style={styles.panelTitle}>Chọn biến thể SKU</Text>
         <View style={styles.listStack}>
           {products.map((p) =>
             p.variants.map((v) => {
               const active = selectedVariant?.variant.id === v.id;
               return (
-                <Pressable
+                <InteractiveCard
                   key={v.id}
                   onPress={() => {
+                    selectedVariantIdRef.current = v.id;
                     setSelectedVariant({ productName: p.name, variant: v });
                     setMutateError(null);
                   }}
                   style={[styles.rowCard, active && styles.rowCardActive]}
                 >
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.boldText}>
-                      {v.sku} · {p.name}
-                    </Text>
-                    <Text style={styles.mutedText}>
-                      Size {v.size} · {v.color}
-                    </Text>
+                  <View style={styles.rowInner}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.boldText}>
+                        {v.sku} · {p.name}
+                      </Text>
+                      <Text style={styles.mutedText}>
+                        Size {v.size} · {v.color}
+                      </Text>
+                    </View>
+                    <StatusBadge
+                      label={`Tồn: ${v.stockQuantity}`}
+                      tone={v.stockQuantity > 0 ? 'success' : 'danger'}
+                    />
                   </View>
-                  <StatusBadge
-                    label={`Tồn: ${v.stockQuantity}`}
-                    tone={v.stockQuantity > 0 ? 'success' : 'danger'}
-                  />
-                </Pressable>
+                </InteractiveCard>
               );
             }),
           )}
@@ -178,9 +187,10 @@ export function AdminInventoryPanel(): React.ReactElement {
       </View>
 
       {selectedVariant ? (
-        <View style={styles.panel}>
+        <View style={[styles.panel, shadows.card]}>
           <Text style={styles.panelTitle}>
-            Điều chỉnh tồn: {selectedVariant.variant.sku} (Hiện tại: {selectedVariant.variant.stockQuantity})
+            Điều chỉnh tồn: {selectedVariant.variant.sku} (Hiện tại:{' '}
+            {selectedVariant.variant.stockQuantity})
           </Text>
           {mutateError ? <Text style={styles.errorText}>{mutateError}</Text> : null}
           <FieldInput
@@ -218,7 +228,7 @@ export function AdminInventoryPanel(): React.ReactElement {
           ) : (
             <View style={styles.listStack}>
               {history.map((h) => (
-                <View key={h.id} style={styles.rowCard}>
+                <View key={h.id} style={[styles.rowCard, styles.rowInner]}>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.boldText}>{h.reason}</Text>
                     <Text style={styles.mutedText}>{formatDateTime(h.createdAt)}</Text>
@@ -247,13 +257,14 @@ const ORDER_FILTERS: Array<OrderStatus | 'ALL'> = [
   'CANCELLED',
 ];
 
-/** Admin/Staff order fulfillment queue implementing M1-10 order transitions & COD delivery. */
+/** Admin/Staff order fulfillment queue with interactive rows and animated status track. */
 export function AdminOrdersPanel(): React.ReactElement {
   const { hasStaffPermission, handleApiError, showToast } = useApp();
 
   const [statusFilter, setStatusFilter] = useState<OrderStatus | 'ALL'>('ALL');
   const [orders, setOrders] = useState<Order[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const selectedOrderIdRef = useRef<EntityId | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [cancelReason, setCancelReason] = useState('');
@@ -273,18 +284,22 @@ export function AdminOrdersPanel(): React.ReactElement {
         statusFilter === 'ALL' ? undefined : statusFilter,
       );
       setOrders(page.items);
-      if (selectedOrder) {
-        const refreshed = page.items.find((o) => o.id === selectedOrder.id);
-        setSelectedOrder(refreshed ?? page.items[0] ?? null);
+      const currentOrderId = selectedOrderIdRef.current;
+      if (currentOrderId) {
+        const refreshed = page.items.find((o) => o.id === currentOrderId) ?? page.items[0] ?? null;
+        selectedOrderIdRef.current = refreshed?.id ?? null;
+        setSelectedOrder(refreshed);
       } else {
-        setSelectedOrder(page.items[0] ?? null);
+        const first = page.items[0] ?? null;
+        selectedOrderIdRef.current = first?.id ?? null;
+        setSelectedOrder(first);
       }
     } catch (err) {
       setError(handleApiError(err, 'Không thể tải danh sách đơn hàng.'));
     } finally {
       setLoading(false);
     }
-  }, [handleApiError, selectedOrder, statusFilter]);
+  }, [handleApiError, statusFilter]);
 
   useEffect(() => {
     if (canRead) {
@@ -363,9 +378,13 @@ export function AdminOrdersPanel(): React.ReactElement {
     PACKING: 'SHIPPING',
   };
 
+  const selectedStepIdx = selectedOrder ? ORDER_STEPS.indexOf(selectedOrder.status) : 0;
+  const selectedProgress =
+    selectedOrder?.status === 'CANCELLED' ? 1 : (selectedStepIdx + 1) / ORDER_STEPS.length;
+
   return (
     <View style={styles.stack}>
-      <View style={styles.panel}>
+      <View style={[styles.panel, shadows.card]}>
         <Text style={styles.panelTitle}>Hàng đợi đơn hàng</Text>
         <View style={styles.rowWrap}>
           {ORDER_FILTERS.map((st) => (
@@ -374,7 +393,9 @@ export function AdminOrdersPanel(): React.ReactElement {
               onPress={() => setStatusFilter(st)}
               style={[styles.miniChip, statusFilter === st && styles.miniChipActive]}
             >
-              <Text style={styles.miniChipText}>{st}</Text>
+              <Text style={[styles.miniChipText, statusFilter === st && styles.miniChipTextActive]}>
+                {st}
+              </Text>
             </Pressable>
           ))}
         </View>
@@ -394,36 +415,47 @@ export function AdminOrdersPanel(): React.ReactElement {
         ) : (
           <View style={styles.listStack}>
             {orders.map((o) => (
-              <Pressable
+              <InteractiveCard
                 key={o.id}
-                onPress={() => setSelectedOrder(o)}
+                onPress={() => {
+                  selectedOrderIdRef.current = o.id;
+                  setSelectedOrder(o);
+                }}
                 style={[styles.rowCard, selectedOrder?.id === o.id && styles.rowCardActive]}
               >
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.boldText}>
-                    Đơn #{o.id} · {o.address.name}
-                  </Text>
-                  <Text style={styles.mutedText}>
-                    {formatDateTime(o.createdAt)} · {formatVnd(o.total)}
-                  </Text>
+                <View style={styles.rowInner}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.boldText}>
+                      Đơn #{o.id} · {o.address.name}
+                    </Text>
+                    <Text style={styles.mutedText}>
+                      {formatDateTime(o.createdAt)} · {formatVnd(o.total)}
+                    </Text>
+                  </View>
+                  <StatusBadge label={o.status} tone="accent" />
+                  <StatusBadge
+                    label={o.paymentStatus}
+                    tone={o.paymentStatus === 'PAID' ? 'success' : 'warning'}
+                  />
                 </View>
-                <StatusBadge label={o.status} tone="accent" />
-                <StatusBadge
-                  label={o.paymentStatus}
-                  tone={o.paymentStatus === 'PAID' ? 'success' : 'warning'}
-                />
-              </Pressable>
+              </InteractiveCard>
             ))}
           </View>
         )}
       </View>
 
       {selectedOrder ? (
-        <View style={styles.panel}>
+        <View style={[styles.panel, shadows.card]}>
           <View style={styles.rowBetween}>
             <Text style={styles.panelTitle}>Xử lý đơn #{selectedOrder.id}</Text>
             <StatusBadge label={getOrderStatusLabel(selectedOrder.status)} tone="accent" />
           </View>
+
+          <AnimatedProgressTrack
+            progress={selectedProgress}
+            color={selectedOrder.status === 'CANCELLED' ? colors.danger : colors.accent}
+          />
+
           <Text style={styles.mutedText}>
             Thanh toán: {getPaymentStatusLabel(selectedOrder.paymentStatus)}
           </Text>
@@ -547,7 +579,7 @@ export function AdminReviewsPanel(): React.ReactElement {
 
   return (
     <View style={styles.stack}>
-      <View style={styles.panel}>
+      <View style={[styles.panel, shadows.card]}>
         <Text style={styles.panelTitle}>Kiểm duyệt đánh giá ({reviews.length})</Text>
         <View style={styles.rowWrap}>
           {(['ALL', 'VISIBLE', 'HIDDEN'] as const).map((st) => (
@@ -556,7 +588,9 @@ export function AdminReviewsPanel(): React.ReactElement {
               onPress={() => setStatusFilter(st)}
               style={[styles.miniChip, statusFilter === st && styles.miniChipActive]}
             >
-              <Text style={styles.miniChipText}>{st}</Text>
+              <Text style={[styles.miniChipText, statusFilter === st && styles.miniChipTextActive]}>
+                {st}
+              </Text>
             </Pressable>
           ))}
         </View>
@@ -566,7 +600,7 @@ export function AdminReviewsPanel(): React.ReactElement {
         ) : (
           <View style={styles.listStack}>
             {reviews.map((r) => (
-              <View key={r.id} style={styles.rowCard}>
+              <View key={r.id} style={[styles.rowCard, styles.rowInner]}>
                 <View style={{ flex: 1, gap: 3 }}>
                   <Text style={styles.boldText}>
                     Review #{r.id} · SP #{r.productId} · {r.rating}/5 ★
@@ -592,7 +626,7 @@ export function AdminReviewsPanel(): React.ReactElement {
         )}
       </View>
 
-      <View style={styles.panel}>
+      <View style={[styles.panel, shadows.card]}>
         <Text style={styles.panelTitle}>Nhật ký Audit kiểm duyệt ({auditLogs.length})</Text>
         {auditLogs.length === 0 ? (
           <StateCard kind="empty" title="Chưa có thao tác kiểm duyệt nào được ghi" />
@@ -679,7 +713,7 @@ export function AdminUsersPanel(): React.ReactElement {
 
   return (
     <View style={styles.stack}>
-      <View style={styles.panel}>
+      <View style={[styles.panel, shadows.card]}>
         <Text style={styles.panelTitle}>Quản lý tài khoản & Phân quyền Staff MVP B</Text>
         <Text style={styles.mutedText}>
           Quy trình tạo Admin nằm ngoài màn hình này (AC-11). Khóa tài khoản sẽ thu hồi phiên ngay
@@ -722,7 +756,7 @@ export function AdminUsersPanel(): React.ReactElement {
                           onPress={() => void handleToggleStaffPerm(u, perm)}
                           style={[styles.miniChip, granted && styles.miniChipActive]}
                         >
-                          <Text style={styles.miniChipText}>
+                          <Text style={[styles.miniChipText, granted && styles.miniChipTextActive]}>
                             {granted ? '✓ ' : ''}
                             {perm}
                           </Text>
@@ -737,7 +771,7 @@ export function AdminUsersPanel(): React.ReactElement {
         </View>
       </View>
 
-      <View style={styles.panel}>
+      <View style={[styles.panel, shadows.card]}>
         <Text style={styles.panelTitle}>Admin Audit Logs ({auditLogs.length})</Text>
         {auditLogs.slice(0, 12).map((log) => (
           <View key={log.id} style={styles.rowCard}>
@@ -758,11 +792,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.sm,
-    padding: spacing.lg,
+    borderRadius: radius.lg,
+    padding: spacing.xl,
     gap: spacing.md,
   },
-  panelTitle: { fontFamily: typography.serif, fontSize: 19, color: colors.ink },
+  panelTitle: { fontFamily: typography.serif, fontSize: 20, color: colors.ink },
   subTitle: { fontFamily: typography.sans, fontSize: 14, fontWeight: '700', color: colors.ink },
   rowWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, alignItems: 'center' },
   rowBetween: {
@@ -775,8 +809,11 @@ const styles = StyleSheet.create({
   rowCard: {
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.xs,
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceSoft,
     padding: spacing.md,
+  },
+  rowInner: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
@@ -785,7 +822,8 @@ const styles = StyleSheet.create({
   userCard: {
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.xs,
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceSoft,
     padding: spacing.md,
     gap: spacing.sm,
   },
@@ -801,14 +839,16 @@ const styles = StyleSheet.create({
   errorText: { fontFamily: typography.sans, fontSize: 13, color: colors.danger },
   divider: { height: 1, backgroundColor: colors.border, marginVertical: spacing.xs },
   miniChip: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 5,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 6,
     borderWidth: 1,
     borderColor: colors.borderStrong,
-    borderRadius: radius.xs,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surface,
   },
   miniChipActive: { borderColor: colors.accent, backgroundColor: colors.accentSoft },
   miniChipText: { fontFamily: typography.sans, fontSize: 12, color: colors.ink },
+  miniChipTextActive: { color: colors.accent, fontWeight: '700' },
   actionBox: {
     borderTopWidth: 1,
     borderTopColor: colors.border,
@@ -817,10 +857,11 @@ const styles = StyleSheet.create({
   },
   cancelBox: { gap: spacing.sm },
   inlineInput: {
-    minHeight: 38,
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-    borderRadius: radius.xs,
+    minHeight: 42,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    backgroundColor: colors.surfaceSoft,
     paddingHorizontal: spacing.md,
     fontFamily: typography.sans,
     fontSize: 13,

@@ -1,9 +1,14 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { fashionApi } from '../../api/client';
+import {
+  AnimatedProgressTrack,
+  FadeSlideIn,
+  InteractiveCard,
+} from '../../components/Motion';
 import { EditorialButton, StateCard, StatusBadge } from '../../components/UiPrimitives';
 import { useApp } from '../../state/AppContext';
-import { colors, radius, spacing, typography } from '../../theme/tokens';
+import { colors, radius, shadows, spacing, typography } from '../../theme/tokens';
 import { ApiClientError, EntityId, Order, OrderLine, OrderStatus } from '../../types/api';
 import {
   formatDateTime,
@@ -11,6 +16,8 @@ import {
   getOrderStatusLabel,
   getPaymentStatusLabel,
 } from '../../utils/format';
+
+const ORDER_STEPS: OrderStatus[] = ['PENDING', 'CONFIRMED', 'PACKING', 'SHIPPING', 'DELIVERED'];
 
 /** Map OrderStatus to a consistent badge tone. */
 function orderStatusTone(
@@ -30,7 +37,7 @@ function orderStatusTone(
   }
 }
 
-/** Customer order history screen implementing listMyOrders (M1-09). */
+/** Customer order history screen with interactive order cards and stagger entrance. */
 export function OrdersListScreen(): React.ReactElement {
   const { user, navigate, handleApiError } = useApp();
 
@@ -108,28 +115,29 @@ export function OrdersListScreen(): React.ReactElement {
         />
       ) : (
         <View style={styles.list}>
-          {orders.map((order) => (
-            <Pressable
-              key={order.id}
-              onPress={() => navigate({ name: 'order-detail', orderId: order.id })}
-              style={styles.orderCard}
-            >
-              <View style={styles.rowBetween}>
-                <Text style={styles.orderId}>Đơn #{order.id}</Text>
-                <StatusBadge
-                  label={getOrderStatusLabel(order.status)}
-                  tone={orderStatusTone(order.status)}
-                />
-              </View>
-              <Text style={styles.metaText}>Đặt lúc: {formatDateTime(order.createdAt)}</Text>
-              <Text style={styles.metaText}>
-                {order.items.length} sản phẩm · {getPaymentStatusLabel(order.paymentStatus)}
-              </Text>
-              <View style={styles.rowBetween}>
-                <Text style={styles.totalText}>{formatVnd(order.total)}</Text>
-                <Text style={styles.linkText}>Xem chi tiết</Text>
-              </View>
-            </Pressable>
+          {orders.map((order, idx) => (
+            <FadeSlideIn key={order.id} delay={idx * 45} distance={12}>
+              <InteractiveCard
+                onPress={() => navigate({ name: 'order-detail', orderId: order.id })}
+                style={styles.orderCard}
+              >
+                <View style={styles.rowBetween}>
+                  <Text style={styles.orderId}>Đơn #{order.id}</Text>
+                  <StatusBadge
+                    label={getOrderStatusLabel(order.status)}
+                    tone={orderStatusTone(order.status)}
+                  />
+                </View>
+                <Text style={styles.metaText}>Đặt lúc: {formatDateTime(order.createdAt)}</Text>
+                <Text style={styles.metaText}>
+                  {order.items.length} sản phẩm · {getPaymentStatusLabel(order.paymentStatus)}
+                </Text>
+                <View style={styles.rowBetween}>
+                  <Text style={styles.totalText}>{formatVnd(order.total)}</Text>
+                  <Text style={styles.linkText}>Xem chi tiết</Text>
+                </View>
+              </InteractiveCard>
+            </FadeSlideIn>
           ))}
 
           {orders.length < total ? (
@@ -146,7 +154,7 @@ export function OrdersListScreen(): React.ReactElement {
   );
 }
 
-/** Customer order detail screen supporting cancelMyOrder (PENDING only) and verified-purchase reviews. */
+/** Customer order detail screen featuring animated status progress bar, cancel flow, and review picker. */
 export function OrderDetailScreen({ orderId }: { orderId: EntityId }): React.ReactElement {
   const {
     user,
@@ -233,6 +241,9 @@ export function OrderDetailScreen({ orderId }: { orderId: EntityId }): React.Rea
     );
   }
 
+  const stepIdx = ORDER_STEPS.indexOf(order.status);
+  const progressRatio = order.status === 'CANCELLED' ? 1 : (stepIdx + 1) / ORDER_STEPS.length;
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.rowBetween}>
@@ -242,62 +253,87 @@ export function OrderDetailScreen({ orderId }: { orderId: EntityId }): React.Rea
 
       <Text style={styles.title}>Chi tiết đơn #{order.id}</Text>
 
-      <View style={styles.card}>
-        <View style={styles.rowBetween}>
-          <Text style={styles.metaText}>Ngày đặt: {formatDateTime(order.createdAt)}</Text>
-          <StatusBadge
-            label={getPaymentStatusLabel(order.paymentStatus)}
-            tone={order.paymentStatus === 'PAID' ? 'success' : 'warning'}
-          />
-        </View>
-        {order.cancelReason ? (
-          <Text style={styles.cancelNote}>Lý do hủy: {order.cancelReason}</Text>
-        ) : null}
-
-        <View style={styles.divider} />
-        <Text style={styles.sectionHeading}>Thông tin nhận hàng (Snapshot)</Text>
-        <Text style={styles.boldText}>{order.address.name}</Text>
-        <Text style={styles.metaText}>{order.address.phone}</Text>
-        <Text style={styles.bodyText}>{order.address.addressText}</Text>
-
-        {order.status === 'PENDING' ? (
-          <View style={styles.cancelWrap}>
-            {cancelError ? <Text style={styles.errorText}>{cancelError}</Text> : null}
-            <EditorialButton
-              label="Hủy đơn hàng (chỉ khi PENDING)"
-              variant="danger"
-              loading={cancelling}
-              onPress={() => void handleCancelOrder()}
+      <FadeSlideIn distance={12}>
+        <View style={[styles.card, shadows.card]}>
+          <View style={styles.rowBetween}>
+            <Text style={styles.metaText}>Ngày đặt: {formatDateTime(order.createdAt)}</Text>
+            <StatusBadge
+              label={getPaymentStatusLabel(order.paymentStatus)}
+              tone={order.paymentStatus === 'PAID' ? 'success' : 'warning'}
             />
           </View>
-        ) : null}
-      </View>
 
-      <View style={styles.card}>
-        <Text style={styles.sectionHeading}>Sản phẩm trong đơn</Text>
-        {order.items.map((line) => (
-          <OrderItemReviewRow
-            key={line.id}
-            line={line}
-            orderStatus={order.status}
-            alreadyReviewedInSession={Boolean(reviewedOrderItems[line.id])}
-            onReviewed={() => markOrderItemReviewed(line.id)}
-          />
-        ))}
-        <View style={styles.divider} />
-        <View style={styles.rowBetween}>
-          <Text style={styles.metaText}>Tạm tính</Text>
-          <Text style={styles.metaText}>{formatVnd(order.subtotal)}</Text>
+          <View style={styles.timelineWrap}>
+            <AnimatedProgressTrack
+              progress={progressRatio}
+              color={order.status === 'CANCELLED' ? colors.danger : colors.accent}
+            />
+            <View style={styles.timelineLabels}>
+              {ORDER_STEPS.map((st, idx) => (
+                <Text
+                  key={st}
+                  style={[
+                    styles.timelineStepText,
+                    stepIdx >= idx && order.status !== 'CANCELLED' && styles.timelineStepActive,
+                  ]}
+                >
+                  {st}
+                </Text>
+              ))}
+            </View>
+          </View>
+
+          {order.cancelReason ? (
+            <Text style={styles.cancelNote}>Lý do hủy: {order.cancelReason}</Text>
+          ) : null}
+
+          <View style={styles.divider} />
+          <Text style={styles.sectionHeading}>Thông tin nhận hàng (Snapshot)</Text>
+          <Text style={styles.boldText}>{order.address.name}</Text>
+          <Text style={styles.metaText}>{order.address.phone}</Text>
+          <Text style={styles.bodyText}>{order.address.addressText}</Text>
+
+          {order.status === 'PENDING' ? (
+            <View style={styles.cancelWrap}>
+              {cancelError ? <Text style={styles.errorText}>{cancelError}</Text> : null}
+              <EditorialButton
+                label="Hủy đơn hàng (chỉ khi PENDING)"
+                variant="danger"
+                loading={cancelling}
+                onPress={() => void handleCancelOrder()}
+              />
+            </View>
+          ) : null}
         </View>
-        <View style={styles.rowBetween}>
-          <Text style={styles.metaText}>Phí giao hàng (Demo)</Text>
-          <Text style={styles.metaText}>{formatVnd(order.shippingFee)}</Text>
+      </FadeSlideIn>
+
+      <FadeSlideIn delay={70} distance={12}>
+        <View style={[styles.card, shadows.card]}>
+          <Text style={styles.sectionHeading}>Sản phẩm trong đơn</Text>
+          {order.items.map((line) => (
+            <OrderItemReviewRow
+              key={line.id}
+              line={line}
+              orderStatus={order.status}
+              alreadyReviewedInSession={Boolean(reviewedOrderItems[line.id])}
+              onReviewed={() => markOrderItemReviewed(line.id)}
+            />
+          ))}
+          <View style={styles.divider} />
+          <View style={styles.rowBetween}>
+            <Text style={styles.metaText}>Tạm tính</Text>
+            <Text style={styles.metaText}>{formatVnd(order.subtotal)}</Text>
+          </View>
+          <View style={styles.rowBetween}>
+            <Text style={styles.metaText}>Phí giao hàng (Demo)</Text>
+            <Text style={styles.metaText}>{formatVnd(order.shippingFee)}</Text>
+          </View>
+          <View style={styles.rowBetween}>
+            <Text style={styles.boldText}>Tổng đơn</Text>
+            <Text style={styles.totalText}>{formatVnd(order.total)}</Text>
+          </View>
         </View>
-        <View style={styles.rowBetween}>
-          <Text style={styles.boldText}>Tổng đơn</Text>
-          <Text style={styles.totalText}>{formatVnd(order.total)}</Text>
-        </View>
-      </View>
+      </FadeSlideIn>
     </ScrollView>
   );
 }
@@ -388,46 +424,48 @@ function OrderItemReviewRow({
               }}
             />
           ) : (
-            <View style={styles.reviewForm}>
-              <Text style={styles.formLabel}>Chọn số sao</Text>
-              <View style={styles.starRow}>
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <Pressable
-                    key={star}
-                    onPress={() => setRating(star)}
-                    style={[styles.starBtn, rating >= star && styles.starBtnActive]}
-                  >
-                    <Text style={[styles.starText, rating >= star && styles.starTextActive]}>
-                      {star} ★
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-              <TextInput
-                value={content}
-                onChangeText={setContent}
-                placeholder="Chia sẻ cảm nhận về chất vải, phom dáng, kích cỡ..."
-                placeholderTextColor={colors.muted}
-                multiline
-                style={styles.reviewInput}
-              />
-              {error ? <Text style={styles.errorText}>{error}</Text> : null}
-              <View style={styles.rowGap}>
-                <EditorialButton
-                  label="Gửi đánh giá"
-                  compact
-                  loading={submitting}
-                  onPress={() => void handleSubmitReview()}
+            <FadeSlideIn distance={8} style={{ width: '100%' }}>
+              <View style={styles.reviewForm}>
+                <Text style={styles.formLabel}>Chọn số sao</Text>
+                <View style={styles.starRow}>
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <Pressable
+                      key={star}
+                      onPress={() => setRating(star)}
+                      style={[styles.starBtn, rating >= star && styles.starBtnActive]}
+                    >
+                      <Text style={[styles.starText, rating >= star && styles.starTextActive]}>
+                        {star} ★
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+                <TextInput
+                  value={content}
+                  onChangeText={setContent}
+                  placeholder="Chia sẻ cảm nhận về chất vải, phom dáng, kích cỡ..."
+                  placeholderTextColor={colors.muted}
+                  multiline
+                  style={styles.reviewInput}
                 />
-                <EditorialButton
-                  label="Đóng"
-                  variant="secondary"
-                  compact
-                  disabled={submitting}
-                  onPress={() => setOpenForm(false)}
-                />
+                {error ? <Text style={styles.errorText}>{error}</Text> : null}
+                <View style={styles.rowGap}>
+                  <EditorialButton
+                    label="Gửi đánh giá"
+                    compact
+                    loading={submitting}
+                    onPress={() => void handleSubmitReview()}
+                  />
+                  <EditorialButton
+                    label="Đóng"
+                    variant="secondary"
+                    compact
+                    disabled={submitting}
+                    onPress={() => setOpenForm(false)}
+                  />
+                </View>
               </View>
-            </View>
+            </FadeSlideIn>
           )}
         </View>
       ) : null}
@@ -446,14 +484,14 @@ const styles = StyleSheet.create({
     gap: spacing.lg,
     paddingBottom: spacing.xxxl,
   },
-  title: { fontFamily: typography.serif, fontSize: 24, color: colors.ink },
+  title: { fontFamily: typography.serif, fontSize: 25, color: colors.ink },
   sectionHeading: { fontFamily: typography.sans, fontSize: 15, fontWeight: '700', color: colors.ink },
   list: { gap: spacing.md },
   orderCard: {
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.sm,
+    borderRadius: radius.lg,
     padding: spacing.lg,
     gap: spacing.xs,
   },
@@ -461,10 +499,14 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.sm,
+    borderRadius: radius.lg,
     padding: spacing.xl,
     gap: spacing.sm,
   },
+  timelineWrap: { gap: spacing.xs, marginVertical: spacing.xs },
+  timelineLabels: { flexDirection: 'row', justifyContent: 'space-between' },
+  timelineStepText: { fontFamily: typography.sans, fontSize: 10, color: colors.muted },
+  timelineStepActive: { color: colors.accent, fontWeight: '700' },
   rowBetween: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -497,33 +539,33 @@ const styles = StyleSheet.create({
   reviewActionArea: { alignItems: 'flex-start', gap: spacing.sm },
   reviewForm: {
     width: '100%',
-    backgroundColor: colors.canvas,
+    backgroundColor: colors.surfaceSoft,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.xs,
-    padding: spacing.md,
+    borderRadius: radius.md,
+    padding: spacing.lg,
     gap: spacing.sm,
   },
   formLabel: { fontFamily: typography.sans, fontSize: 13, fontWeight: '600', color: colors.ink },
-  starRow: { flexDirection: 'row', gap: spacing.xs },
+  starRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   starBtn: {
     paddingHorizontal: spacing.md,
     paddingVertical: 6,
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-    borderRadius: radius.xs,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    borderRadius: radius.pill,
     backgroundColor: colors.surface,
   },
   starBtnActive: { borderColor: colors.accent, backgroundColor: colors.accentSoft },
   starText: { fontFamily: typography.sans, fontSize: 12, color: colors.muted },
   starTextActive: { color: colors.accent, fontWeight: '700' },
   reviewInput: {
-    minHeight: 72,
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-    borderRadius: radius.xs,
+    minHeight: 76,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
     backgroundColor: colors.surface,
-    padding: spacing.sm,
+    padding: spacing.md,
     fontFamily: typography.sans,
     fontSize: 13,
     color: colors.ink,

@@ -298,3 +298,13 @@
   - Playwright Chromium E2E Smoke Test (`http://127.0.0.1:4173`): PASS (0 console/page errors — verified Catalog pagination, Product Detail, Customer login, Cart -> COD Checkout 201, Customer 403 Admin guard, Admin login).
   - Android runtime / live NestJS MySQL integration: NOT RUN (backend API endpoints chưa triển khai trong `apps/api`).
 - Next task: Chủ dự án review nhánh `feat/frontend-expo-mock`, chạy `npm run web --workspace apps/mobile` hoặc tích hợp với backend NestJS khi Codex hoàn thành M2–M6.
+
+
+## 2026-11-24 — UI/UX & Motion Polish (Nhánh feat/frontend-expo-mock)
+- Scope: Bổ sung hệ thống motion (`src/components/Motion.tsx`: `FadeSlideIn`, `InteractiveCard`, `FloatingAmbient`, `ShimmerBlock`, `AnimatedProgressTrack`), bo góc đa tầng (`radius.xs/sm/md/lg/pill`), bóng đổ (`shadows.soft/card/lifted`), header kính mờ sticky trên Web, pill filters/selectors, timeline tiến trình đơn hàng và làm sạch thumbnail ảnh sản phẩm.
+- Actual commands and results:
+  - `npm run typecheck --workspace apps/mobile`: PASS (0 errors).
+  - `npm run typecheck --workspace apps/api`: PASS (0 errors).
+  - `node /tmp/fashion-mock-test/scripts/verifyMockContracts.js`: PASS (`ALL OPENAPI v1.0.0 & RBAC v1 MOCK CONTRACT CHECKS PASSED`).
+  - `EXPO_NO_TELEMETRY=1 HOME=/tmp npx expo export --platform web --output-dir /tmp/fashion-web-dist`: PASS (294 modules, 731KB web bundle).
+  - Playwright Chromium E2E Smoke Test (`http://127.0.0.1:4174`): PASS (`PLAYWRIGHT E2E WEB SMOKE TEST PASSED (0 errors)`).

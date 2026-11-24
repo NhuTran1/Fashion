@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { fashionApi } from '../../api/client';
+import { FadeSlideIn } from '../../components/Motion';
 import {
   EditorialButton,
   FieldInput,
@@ -8,7 +9,7 @@ import {
   StatusBadge,
 } from '../../components/UiPrimitives';
 import { useApp } from '../../state/AppContext';
-import { colors, radius, spacing, typography } from '../../theme/tokens';
+import { colors, radius, shadows, spacing, typography } from '../../theme/tokens';
 import { Address, EntityId } from '../../types/api';
 
 /** Authenticated user profile screen supporting getMe and logout (M1-09). */
@@ -46,56 +47,60 @@ export function ProfileScreen(): React.ReactElement {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <View style={styles.card}>
-        <View style={styles.rowBetween}>
-          <Text style={styles.title}>Hồ sơ tài khoản</Text>
-          <StatusBadge label={user.role} tone={user.role === 'CUSTOMER' ? 'success' : 'accent'} />
-        </View>
-        <View style={styles.infoGrid}>
-          <Text style={styles.metaLabel}>ID tài khoản</Text>
-          <Text style={styles.metaValue}>#{user.id}</Text>
-          <Text style={styles.metaLabel}>Email</Text>
-          <Text style={styles.metaValue}>{user.email}</Text>
-          <Text style={styles.metaLabel}>Trạng thái</Text>
-          <StatusBadge label={user.status} tone={user.status === 'ACTIVE' ? 'success' : 'danger'} />
-          {user.role === 'STAFF' && user.permissions ? (
-            <>
-              <Text style={styles.metaLabel}>Quyền Staff MVP B</Text>
-              <Text style={styles.metaValue}>{user.permissions.join(', ') || 'Chưa cấp quyền'}</Text>
-            </>
-          ) : null}
-        </View>
+      <FadeSlideIn distance={14}>
+        <View style={[styles.card, shadows.card]}>
+          <View style={styles.rowBetween}>
+            <Text style={styles.title}>Hồ sơ tài khoản</Text>
+            <StatusBadge label={user.role} tone={user.role === 'CUSTOMER' ? 'success' : 'accent'} />
+          </View>
+          <View style={styles.infoGrid}>
+            <Text style={styles.metaLabel}>ID tài khoản</Text>
+            <Text style={styles.metaValue}>#{user.id}</Text>
+            <Text style={styles.metaLabel}>Email</Text>
+            <Text style={styles.metaValue}>{user.email}</Text>
+            <Text style={styles.metaLabel}>Trạng thái</Text>
+            <StatusBadge label={user.status} tone={user.status === 'ACTIVE' ? 'success' : 'danger'} />
+            {user.role === 'STAFF' && user.permissions ? (
+              <>
+                <Text style={styles.metaLabel}>Quyền Staff MVP B</Text>
+                <Text style={styles.metaValue}>
+                  {user.permissions.join(', ') || 'Chưa cấp quyền'}
+                </Text>
+              </>
+            ) : null}
+          </View>
 
-        {error ? <Text style={styles.errorText}>{error}</Text> : null}
+          {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
-        <View style={styles.actionsCol}>
-          {user.role === 'CUSTOMER' ? (
-            <>
+          <View style={styles.actionsCol}>
+            {user.role === 'CUSTOMER' ? (
+              <>
+                <EditorialButton
+                  label="Sổ địa chỉ giao hàng"
+                  variant="secondary"
+                  onPress={() => navigate({ name: 'addresses' })}
+                />
+                <EditorialButton
+                  label="Đơn hàng của tôi"
+                  variant="secondary"
+                  onPress={() => navigate({ name: 'orders' })}
+                />
+              </>
+            ) : (
               <EditorialButton
-                label="Sổ địa chỉ giao hàng"
-                variant="secondary"
-                onPress={() => navigate({ name: 'addresses' })}
+                label="Mở khu vực quản trị"
+                onPress={() => navigate({ name: 'admin', tab: 'orders' })}
               />
-              <EditorialButton
-                label="Đơn hàng của tôi"
-                variant="secondary"
-                onPress={() => navigate({ name: 'orders' })}
-              />
-            </>
-          ) : (
+            )}
             <EditorialButton
-              label="Mở khu vực quản trị"
-              onPress={() => navigate({ name: 'admin', tab: 'orders' })}
+              label="Đăng xuất"
+              variant="danger"
+              loading={loggingOut}
+              onPress={() => void handleLogout()}
             />
-          )}
-          <EditorialButton
-            label="Đăng xuất"
-            variant="danger"
-            loading={loggingOut}
-            onPress={() => void handleLogout()}
-          />
+          </View>
         </View>
-      </View>
+      </FadeSlideIn>
     </ScrollView>
   );
 }
@@ -239,84 +244,85 @@ export function AddressesScreen(): React.ReactElement {
         />
       ) : (
         <View style={styles.list}>
-          {addresses.map((addr) => (
-            <View key={addr.id} style={styles.addressCard}>
-              <View style={styles.rowBetween}>
-                <Text style={styles.addrName}>{addr.name}</Text>
-                {addr.isDefault ? <StatusBadge label="Mặc định" tone="accent" /> : null}
-              </View>
-              <Text style={styles.addrPhone}>{addr.phone}</Text>
-              <Text style={styles.addrText}>{addr.addressText}</Text>
-              <View style={styles.addrActions}>
-                <EditorialButton
-                  label="Chỉnh sửa"
-                  variant="secondary"
-                  compact
-                  onPress={() => openEditor(addr)}
-                />
-                {!addr.isDefault ? (
+          {addresses.map((addr, idx) => (
+            <FadeSlideIn key={addr.id} delay={idx * 45} distance={10}>
+              <View style={[styles.addressCard, shadows.soft]}>
+                <View style={styles.rowBetween}>
+                  <Text style={styles.addrName}>{addr.name}</Text>
+                  {addr.isDefault ? <StatusBadge label="Mặc định" tone="accent" /> : null}
+                </View>
+                <Text style={styles.addrPhone}>{addr.phone}</Text>
+                <Text style={styles.addrText}>{addr.addressText}</Text>
+                <View style={styles.addrActions}>
                   <EditorialButton
-                    label="Đặt làm mặc định"
-                    variant="ghost"
+                    label="Chỉnh sửa"
+                    variant="secondary"
                     compact
-                    onPress={async () => {
-                      try {
-                        await fashionApi.updateAddress(addr.id, { isDefault: true });
-                        await fetchAddresses();
-                      } catch (err) {
-                        showToast('error', handleApiError(err));
-                      }
-                    }}
+                    onPress={() => openEditor(addr)}
                   />
-                ) : null}
+                  {!addr.isDefault ? (
+                    <EditorialButton
+                      label="Đặt làm mặc định"
+                      variant="ghost"
+                      compact
+                      onPress={async () => {
+                        try {
+                          await fashionApi.updateAddress(addr.id, { isDefault: true });
+                          await fetchAddresses();
+                        } catch (err) {
+                          showToast('error', handleApiError(err));
+                        }
+                      }}
+                    />
+                  ) : null}
+                </View>
               </View>
-            </View>
+            </FadeSlideIn>
           ))}
         </View>
       )}
 
       {showForm ? (
-        <View style={styles.card}>
-          <Text style={styles.formHeading}>
-            {editingId ? 'Cập nhật địa chỉ' : 'Thêm địa chỉ nhận hàng'}
-          </Text>
-          {saveError ? <Text style={styles.errorText}>{saveError}</Text> : null}
-          <FieldInput label="Tên người nhận" value={name} onChangeText={setName} />
-          <FieldInput
-            label="Số điện thoại"
-            value={phone}
-            onChangeText={setPhone}
-            keyboardType="phone-pad"
-          />
-          <FieldInput
-            label="Địa chỉ chi tiết"
-            value={addressText}
-            onChangeText={setAddressText}
-            multiline
-          />
-          <Pressable
-            onPress={() => setIsDefault((v) => !v)}
-            style={styles.checkboxRow}
-          >
-            <View style={[styles.checkboxBox, isDefault && styles.checkboxChecked]} />
-            <Text style={styles.checkboxLabel}>Đặt làm địa chỉ giao hàng mặc định</Text>
-          </Pressable>
-          <View style={styles.addrActions}>
-            <EditorialButton
-              label="Lưu địa chỉ"
-              loading={saving}
-              onPress={() => void handleSave()}
+        <FadeSlideIn distance={12}>
+          <View style={[styles.card, shadows.card]}>
+            <Text style={styles.formHeading}>
+              {editingId ? 'Cập nhật địa chỉ' : 'Thêm địa chỉ nhận hàng'}
+            </Text>
+            {saveError ? <Text style={styles.errorText}>{saveError}</Text> : null}
+            <FieldInput label="Tên người nhận" value={name} onChangeText={setName} />
+            <FieldInput
+              label="Số điện thoại"
+              value={phone}
+              onChangeText={setPhone}
+              keyboardType="phone-pad"
             />
-            {addresses.length > 0 ? (
+            <FieldInput
+              label="Địa chỉ chi tiết"
+              value={addressText}
+              onChangeText={setAddressText}
+              multiline
+            />
+            <Pressable onPress={() => setIsDefault((v) => !v)} style={styles.checkboxRow}>
+              <View style={[styles.checkboxBox, isDefault && styles.checkboxChecked]} />
+              <Text style={styles.checkboxLabel}>Đặt làm địa chỉ giao hàng mặc định</Text>
+            </Pressable>
+            <View style={styles.addrActions}>
               <EditorialButton
-                label="Hủy"
-                variant="secondary"
-                disabled={saving}
-                onPress={() => setShowForm(false)}
+                label="Lưu địa chỉ"
+                loading={saving}
+                onPress={() => void handleSave()}
               />
-            ) : null}
+              {addresses.length > 0 ? (
+                <EditorialButton
+                  label="Hủy"
+                  variant="secondary"
+                  disabled={saving}
+                  onPress={() => setShowForm(false)}
+                />
+              ) : null}
+            </View>
           </View>
-        </View>
+        </FadeSlideIn>
       ) : null}
     </ScrollView>
   );
@@ -337,7 +343,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.sm,
+    borderRadius: radius.lg,
     padding: spacing.xl,
     gap: spacing.md,
   },
@@ -347,8 +353,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm,
   },
-  title: { fontFamily: typography.serif, fontSize: 24, color: colors.ink },
-  formHeading: { fontFamily: typography.serif, fontSize: 18, color: colors.ink },
+  title: { fontFamily: typography.serif, fontSize: 25, color: colors.ink },
+  formHeading: { fontFamily: typography.serif, fontSize: 19, color: colors.ink },
   infoGrid: { gap: spacing.xs },
   metaLabel: { fontFamily: typography.sans, fontSize: 12, color: colors.muted, marginTop: 6 },
   metaValue: { fontFamily: typography.sans, fontSize: 15, color: colors.ink, fontWeight: '500' },
@@ -359,7 +365,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.sm,
+    borderRadius: radius.md,
     padding: spacing.lg,
     gap: spacing.xs,
   },
@@ -367,13 +373,18 @@ const styles = StyleSheet.create({
   addrPhone: { fontFamily: typography.mono, fontSize: 13, color: colors.muted },
   addrText: { fontFamily: typography.sans, fontSize: 14, lineHeight: 20, color: colors.ink },
   addrActions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
-  checkboxRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm },
+  checkboxRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+  },
   checkboxBox: {
-    width: 18,
-    height: 18,
+    width: 20,
+    height: 20,
     borderWidth: 1.5,
     borderColor: colors.borderStrong,
-    borderRadius: 2,
+    borderRadius: 6,
     backgroundColor: colors.surface,
   },
   checkboxChecked: { backgroundColor: colors.accent, borderColor: colors.accent },

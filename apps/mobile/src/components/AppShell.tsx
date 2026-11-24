@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
+  Animated,
   Platform,
   Pressable,
   SafeAreaView,
@@ -7,9 +8,9 @@ import {
   Text,
   useWindowDimensions,
   View,
+  ViewStyle,
 } from 'react-native';
 import { fashionApi } from '../api/client';
-import { EditorialButton, StatusBadge } from './UiPrimitives';
 import { AdminWorkspaceScreen } from '../screens/admin/AdminWorkspaceScreen';
 import { AuthScreen } from '../screens/customer/AuthScreen';
 import {
@@ -22,8 +23,12 @@ import { OrderDetailScreen, OrdersListScreen } from '../screens/customer/OrdersS
 import { ProductDetailScreen } from '../screens/customer/ProductDetailScreen';
 import { AddressesScreen, ProfileScreen } from '../screens/customer/ProfileAddressesScreens';
 import { useApp } from '../state/AppContext';
-import { colors, radius, spacing, typography } from '../theme/tokens';
+import { colors, radius, shadows, spacing, typography } from '../theme/tokens';
 import { MockFaultMode } from '../types/api';
+import { FadeSlideIn } from './Motion';
+import { EditorialButton, StatusBadge } from './UiPrimitives';
+
+const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 
 const FAULT_OPTIONS: Array<{ mode: MockFaultMode; label: string }> = [
   { mode: 'NONE', label: 'Bình thường' },
@@ -34,7 +39,7 @@ const FAULT_OPTIONS: Array<{ mode: MockFaultMode; label: string }> = [
   { mode: 'CSRF_INVALID', label: 'CSRF lỗi (403)' },
 ];
 
-/** Top-level responsive application shell rendering navigation chrome, toast, QA drawer, and active route. */
+/** Top-level responsive application shell with frosted glass header, animated cart badge, and route transitions. */
 export function AppShell(): React.ReactElement {
   const {
     route,
@@ -53,12 +58,43 @@ export function AppShell(): React.ReactElement {
   const cartCount = cart.items.reduce((sum, item) => sum + item.quantity, 0);
   const isCompact = width < 680;
 
+  // Pop animation whenever cart item count changes.
+  const cartScale = useRef(new Animated.Value(1)).current;
+  const prevCartCount = useRef(cartCount);
+  useEffect(() => {
+    if (prevCartCount.current !== cartCount) {
+      prevCartCount.current = cartCount;
+      Animated.sequence([
+        Animated.spring(cartScale, {
+          toValue: 1.14,
+          friction: 5,
+          tension: 240,
+          useNativeDriver: USE_NATIVE_DRIVER,
+        }),
+        Animated.spring(cartScale, {
+          toValue: 1,
+          friction: 6,
+          tension: 200,
+          useNativeDriver: USE_NATIVE_DRIVER,
+        }),
+      ]).start();
+    }
+  }, [cartCount, cartScale]);
+
+  const routeKey =
+    route.name === 'product'
+      ? `product-${route.productId}`
+      : route.name === 'order-detail'
+        ? `order-${route.orderId}`
+        : route.name;
+
   return (
     <SafeAreaView style={styles.root}>
-      {/* Minimal architectural header bar */}
-      <View style={styles.header}>
+      {/* Frosted glass sticky header bar */}
+      <View style={[styles.header, shadows.soft]}>
         <View style={styles.headerInner}>
           <Pressable onPress={() => navigate({ name: 'catalog' })} style={styles.brandBtn}>
+            <View style={styles.brandDot} />
             <Text style={styles.brandWordmark}>SỞI ATELIER</Text>
             <StatusBadge
               label={fashionApi.isMockMode() ? 'Mock OpenAPI v1.0.0' : 'Live API'}
@@ -73,11 +109,13 @@ export function AppShell(): React.ReactElement {
               onPress={() => navigate({ name: 'catalog' })}
             />
             {!user || user.role === 'CUSTOMER' ? (
-              <NavTab
-                label={`Giỏ hàng (${cartCount})`}
-                active={route.name === 'cart' || route.name === 'checkout'}
-                onPress={() => navigate({ name: 'cart' })}
-              />
+              <Animated.View style={{ transform: [{ scale: cartScale }] }}>
+                <NavTab
+                  label={`Giỏ hàng (${cartCount})`}
+                  active={route.name === 'cart' || route.name === 'checkout'}
+                  onPress={() => navigate({ name: 'cart' })}
+                />
+              </Animated.View>
             ) : null}
             {user?.role === 'CUSTOMER' ? (
               <NavTab
@@ -113,7 +151,7 @@ export function AppShell(): React.ReactElement {
 
         {/* Collapsible Mock Fault Simulator for verifying M1-09/M1-10 error & retry flows */}
         {showQaBar && fashionApi.isMockMode() ? (
-          <View style={styles.qaPanel}>
+          <FadeSlideIn distance={8} duration={220} style={styles.qaPanel}>
             <View style={styles.qaPanelInner}>
               <Text style={styles.qaLabel}>
                 Giả lập lỗi backend cho request kế tiếp ({Platform.OS}):
@@ -143,28 +181,31 @@ export function AppShell(): React.ReactElement {
                 />
               </View>
             </View>
-          </View>
+          </FadeSlideIn>
         ) : null}
       </View>
 
-      {/* Transient global feedback banner */}
+      {/* Floating pill toast notification with smooth slide-in */}
       {toast ? (
-        <View
-          style={[
-            styles.toast,
-            toast.tone === 'error' && styles.toastError,
-            toast.tone === 'success' && styles.toastSuccess,
-          ]}
-        >
-          <Text style={styles.toastText}>{toast.message}</Text>
-          <Pressable onPress={clearToast}>
-            <Text style={styles.toastDismiss}>Đóng</Text>
-          </Pressable>
-        </View>
+        <FadeSlideIn key={toast.id} distance={10} duration={240} style={styles.toastWrap}>
+          <View
+            style={[
+              styles.toast,
+              shadows.lifted,
+              toast.tone === 'error' && styles.toastError,
+              toast.tone === 'success' && styles.toastSuccess,
+            ]}
+          >
+            <Text style={styles.toastText}>{toast.message}</Text>
+            <Pressable onPress={clearToast} style={styles.toastDismissBtn}>
+              <Text style={styles.toastDismiss}>Đóng</Text>
+            </Pressable>
+          </View>
+        </FadeSlideIn>
       ) : null}
 
-      {/* Active route renderer */}
-      <View style={styles.body}>
+      {/* Active route renderer with smooth fade-slide entrance */}
+      <FadeSlideIn key={routeKey} distance={10} duration={260} style={styles.body}>
         {route.name === 'catalog' ? <CatalogScreen /> : null}
         {route.name === 'product' ? <ProductDetailScreen productId={route.productId} /> : null}
         {route.name === 'auth' ? <AuthScreen initialMode={route.mode} /> : null}
@@ -178,12 +219,12 @@ export function AppShell(): React.ReactElement {
         {route.name === 'orders' ? <OrdersListScreen /> : null}
         {route.name === 'order-detail' ? <OrderDetailScreen orderId={route.orderId} /> : null}
         {route.name === 'admin' ? <AdminWorkspaceScreen initialTab={route.tab} /> : null}
-      </View>
+      </FadeSlideIn>
     </SafeAreaView>
   );
 }
 
-/** Single navigation tab pill inside the top bar. */
+/** Pill-shaped navigation tab with subtle hover feedback. */
 function NavTab({
   label,
   active,
@@ -193,8 +234,19 @@ function NavTab({
   active: boolean;
   onPress: () => void;
 }): React.ReactElement {
+  const [hovered, setHovered] = useState(false);
+
   return (
-    <Pressable onPress={onPress} style={[styles.navTab, active && styles.navTabActive]}>
+    <Pressable
+      onPress={onPress}
+      onHoverIn={() => setHovered(true)}
+      onHoverOut={() => setHovered(false)}
+      style={[
+        styles.navTab,
+        hovered && !active && styles.navTabHover,
+        active && styles.navTabActive,
+      ]}
+    >
       <Text style={[styles.navTabText, active && styles.navTabTextActive]}>{label}</Text>
     </Pressable>
   );
@@ -206,9 +258,13 @@ const styles = StyleSheet.create({
     backgroundColor: colors.canvas,
   },
   header: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceGlass,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
+    zIndex: 20,
+    ...(Platform.OS === 'web'
+      ? ({ backdropFilter: 'blur(16px)', position: 'sticky', top: 0 } as unknown as ViewStyle)
+      : {}),
   },
   headerInner: {
     maxWidth: 1200,
@@ -227,12 +283,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm,
   },
+  brandDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 99,
+    backgroundColor: colors.accent,
+  },
   brandWordmark: {
     fontFamily: typography.serif,
     fontSize: 19,
     fontWeight: '700',
     color: colors.ink,
-    letterSpacing: 1.2,
+    letterSpacing: 1.1,
   },
   navActions: {
     flexDirection: 'row',
@@ -242,13 +304,16 @@ const styles = StyleSheet.create({
   },
   navTab: {
     paddingHorizontal: spacing.md,
-    paddingVertical: 6,
-    borderRadius: radius.xs,
+    paddingVertical: 7,
+    borderRadius: radius.pill,
     borderWidth: 1,
     borderColor: 'transparent',
   },
+  navTabHover: {
+    backgroundColor: colors.surfaceAlt,
+  },
   navTabActive: {
-    borderColor: colors.accent,
+    borderColor: '#C9D8EC',
     backgroundColor: colors.accentSoft,
   },
   navTabText: {
@@ -262,12 +327,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   qaToggle: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 5,
-    borderRadius: radius.xs,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 6,
+    borderRadius: radius.pill,
     borderWidth: 1,
     borderColor: colors.borderStrong,
-    backgroundColor: colors.canvas,
+    backgroundColor: colors.surface,
   },
   qaToggleArmed: {
     borderColor: colors.warning,
@@ -279,7 +344,7 @@ const styles = StyleSheet.create({
     color: colors.ink,
   },
   qaPanel: {
-    backgroundColor: colors.canvas,
+    backgroundColor: colors.surfaceSoft,
     borderTopWidth: 1,
     borderTopColor: colors.border,
     paddingVertical: spacing.sm,
@@ -304,9 +369,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   qaChip: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
-    borderRadius: radius.xs,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 5,
+    borderRadius: radius.pill,
     borderWidth: 1,
     borderColor: colors.borderStrong,
     backgroundColor: colors.surface,
@@ -317,10 +382,18 @@ const styles = StyleSheet.create({
   },
   qaChipText: { fontFamily: typography.sans, fontSize: 12, color: colors.ink },
   qaChipTextActive: { color: colors.warning, fontWeight: '700' },
+  toastWrap: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+    maxWidth: 1200,
+    width: '100%',
+    alignSelf: 'center',
+  },
   toast: {
     backgroundColor: colors.ink,
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
+    paddingVertical: spacing.md,
+    borderRadius: radius.md,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -329,6 +402,12 @@ const styles = StyleSheet.create({
   toastError: { backgroundColor: colors.danger },
   toastSuccess: { backgroundColor: colors.success },
   toastText: { fontFamily: typography.sans, fontSize: 13, color: '#FFFFFF', flex: 1 },
+  toastDismissBtn: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: radius.pill,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+  },
   toastDismiss: {
     fontFamily: typography.sans,
     fontSize: 12,

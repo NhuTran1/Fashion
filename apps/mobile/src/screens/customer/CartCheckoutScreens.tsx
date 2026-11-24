@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { fashionApi } from '../../api/client';
+import { FadeSlideIn, InteractiveCard } from '../../components/Motion';
 import {
   EditorialButton,
   GarmentArtwork,
@@ -8,7 +9,7 @@ import {
   StatusBadge,
 } from '../../components/UiPrimitives';
 import { useApp } from '../../state/AppContext';
-import { colors, radius, spacing, typography } from '../../theme/tokens';
+import { colors, radius, shadows, spacing, typography } from '../../theme/tokens';
 import { Address, ApiClientError, CheckoutInput, EntityId, Order, Product, Variant } from '../../types/api';
 import { createIdempotencyKey, formatDateTime, formatVnd } from '../../utils/format';
 
@@ -17,7 +18,7 @@ interface VariantMeta {
   variant: Variant;
 }
 
-/** Shopping cart screen enforcing per-line mutation lock and server totals (M1-09). */
+/** Soft-curved shopping cart screen enforcing per-line mutation lock and server totals (M1-09). */
 export function CartScreen(): React.ReactElement {
   const { user, cart, refreshCart, navigate, handleApiError, showToast } = useApp();
 
@@ -129,83 +130,91 @@ export function CartScreen(): React.ReactElement {
       ) : (
         <>
           <View style={styles.list}>
-            {cart.items.map((line) => {
+            {cart.items.map((line, idx) => {
               const meta = catalogMap[line.variantId];
               const isBusy = Boolean(busyVariants[line.variantId]);
 
               return (
-                <View key={line.variantId} style={styles.cartRow}>
-                  <View style={styles.cartThumb}>
-                    <GarmentArtwork
-                      uri={meta?.product.images[0]?.url}
-                      altText={meta?.product.name || `Variant #${line.variantId}`}
-                      height={92}
-                    />
-                  </View>
-                  <View style={styles.cartInfo}>
-                    <Text style={styles.itemName}>
-                      {meta ? meta.product.name : `Sản phẩm biến thể #${line.variantId}`}
-                    </Text>
-                    <Text style={styles.itemMeta}>
-                      {meta
-                        ? `Size ${meta.variant.size} · Màu ${meta.variant.color} · SKU ${meta.variant.sku}`
-                        : `Variant ID: ${line.variantId}`}
-                    </Text>
-                    <Text style={styles.itemPrice}>
-                      Đơn giá máy chủ: {formatVnd(line.unitPrice)}
-                    </Text>
-
-                    <View style={styles.cartControls}>
-                      <View style={styles.stepper}>
-                        <Pressable
-                          disabled={isBusy || line.quantity <= 1}
-                          onPress={() => void handleQuantityChange(line.variantId, line.quantity - 1)}
-                          style={[styles.stepBtn, (isBusy || line.quantity <= 1) && { opacity: 0.4 }]}
-                        >
-                          <Text style={styles.stepText}>-</Text>
-                        </Pressable>
-                        <Text style={styles.qtyVal}>{line.quantity}</Text>
-                        <Pressable
-                          disabled={isBusy}
-                          onPress={() => void handleQuantityChange(line.variantId, line.quantity + 1)}
-                          style={[styles.stepBtn, isBusy && { opacity: 0.4 }]}
-                        >
-                          <Text style={styles.stepText}>+</Text>
-                        </Pressable>
-                      </View>
-
-                      <EditorialButton
-                        label="Xóa"
-                        variant="ghost"
-                        compact
-                        disabled={isBusy}
-                        onPress={() => void handleRemoveItem(line.variantId)}
+                <FadeSlideIn key={line.variantId} delay={idx * 45} distance={12}>
+                  <View style={[styles.cartRow, shadows.soft]}>
+                    <View style={styles.cartThumb}>
+                      <GarmentArtwork
+                        uri={meta?.product.images[0]?.url}
+                        altText={meta?.product.name || `Variant #${line.variantId}`}
+                        height={94}
                       />
                     </View>
+                    <View style={styles.cartInfo}>
+                      <Text style={styles.itemName}>
+                        {meta ? meta.product.name : `Sản phẩm biến thể #${line.variantId}`}
+                      </Text>
+                      <Text style={styles.itemMeta}>
+                        {meta
+                          ? `Size ${meta.variant.size} · Màu ${meta.variant.color} · SKU ${meta.variant.sku}`
+                          : `Variant ID: ${line.variantId}`}
+                      </Text>
+                      <Text style={styles.itemPrice}>
+                        Đơn giá máy chủ: {formatVnd(line.unitPrice)}
+                      </Text>
+
+                      <View style={styles.cartControls}>
+                        <View style={styles.stepper}>
+                          <Pressable
+                            disabled={isBusy || line.quantity <= 1}
+                            onPress={() =>
+                              void handleQuantityChange(line.variantId, line.quantity - 1)
+                            }
+                            style={[styles.stepBtn, (isBusy || line.quantity <= 1) && { opacity: 0.4 }]}
+                          >
+                            <Text style={styles.stepText}>-</Text>
+                          </Pressable>
+                          <Text style={styles.qtyVal}>{line.quantity}</Text>
+                          <Pressable
+                            disabled={isBusy}
+                            onPress={() =>
+                              void handleQuantityChange(line.variantId, line.quantity + 1)
+                            }
+                            style={[styles.stepBtn, isBusy && { opacity: 0.4 }]}
+                          >
+                            <Text style={styles.stepText}>+</Text>
+                          </Pressable>
+                        </View>
+
+                        <EditorialButton
+                          label="Xóa"
+                          variant="ghost"
+                          compact
+                          disabled={isBusy}
+                          onPress={() => void handleRemoveItem(line.variantId)}
+                        />
+                      </View>
+                    </View>
+                    <View style={styles.lineTotalCol}>
+                      <Text style={styles.lineTotal}>{formatVnd(line.lineTotal)}</Text>
+                    </View>
                   </View>
-                  <View style={styles.lineTotalCol}>
-                    <Text style={styles.lineTotal}>{formatVnd(line.lineTotal)}</Text>
-                  </View>
-                </View>
+                </FadeSlideIn>
               );
             })}
           </View>
 
-          <View style={styles.summaryCard}>
-            <View style={styles.rowBetween}>
-              <Text style={styles.summaryLabel}>Tạm tính (máy chủ xác thực)</Text>
-              <Text style={styles.summaryValue}>{formatVnd(cart.subtotal)}</Text>
+          <FadeSlideIn delay={80} distance={12}>
+            <View style={[styles.summaryCard, shadows.card]}>
+              <View style={styles.rowBetween}>
+                <Text style={styles.summaryLabel}>Tạm tính (máy chủ xác thực)</Text>
+                <Text style={styles.summaryValue}>{formatVnd(cart.subtotal)}</Text>
+              </View>
+              <View style={styles.rowBetween}>
+                <Text style={styles.summaryMuted}>Phí vận chuyển (Demo)</Text>
+                <Text style={styles.summaryMuted}>0 ₫</Text>
+              </View>
+              <EditorialButton
+                label="Tiến hành thanh toán COD"
+                onPress={() => navigate({ name: 'checkout' })}
+                style={{ marginTop: spacing.sm }}
+              />
             </View>
-            <View style={styles.rowBetween}>
-              <Text style={styles.summaryMuted}>Phí vận chuyển (Demo)</Text>
-              <Text style={styles.summaryMuted}>0 ₫</Text>
-            </View>
-            <EditorialButton
-              label="Tiến hành thanh toán COD"
-              onPress={() => navigate({ name: 'checkout' })}
-              style={{ marginTop: spacing.sm }}
-            />
-          </View>
+          </FadeSlideIn>
         </>
       )}
     </ScrollView>
@@ -375,82 +384,88 @@ export function CheckoutScreen(): React.ReactElement {
 
       <Text style={styles.title}>Xác nhận đặt hàng COD</Text>
 
-      <View style={styles.noticeBox}>
-        <Text style={styles.noticeTitle}>Lưu ý thanh toán mô phỏng (P0)</Text>
-        <Text style={styles.noticeBody}>
-          Đơn hàng dùng phương thức COD mô phỏng (không thu tiền thật, không nhập thẻ). Đơn mới có
-          trạng thái PENDING và thanh toán UNPAID cho tới khi Admin xác nhận giao và thu COD.
-        </Text>
-      </View>
+      <FadeSlideIn distance={12}>
+        <View style={[styles.noticeBox, shadows.soft]}>
+          <Text style={styles.noticeTitle}>Lưu ý thanh toán mô phỏng (P0)</Text>
+          <Text style={styles.noticeBody}>
+            Đơn hàng dùng phương thức COD mô phỏng (không thu tiền thật, không nhập thẻ). Đơn mới có
+            trạng thái PENDING và thanh toán UNPAID cho tới khi Admin xác nhận giao và thu COD.
+          </Text>
+        </View>
+      </FadeSlideIn>
 
       {/* Address selection */}
-      <View style={styles.summaryCard}>
-        <View style={styles.rowBetween}>
-          <Text style={styles.sectionHeading}>Địa chỉ giao hàng</Text>
-          <EditorialButton
-            label="Quản lý địa chỉ"
-            variant="ghost"
-            compact
-            onPress={() => navigate({ name: 'addresses' })}
-          />
-        </View>
-        {addresses.length === 0 ? (
-          <StateCard
-            kind="empty"
-            title="Chưa có địa chỉ giao hàng"
-            message="Bạn cần tạo ít nhất một địa chỉ trước khi đặt đơn."
-            actionLabel="Thêm địa chỉ ngay"
-            onAction={() => navigate({ name: 'addresses' })}
-          />
-        ) : (
-          <View style={styles.addrOptions}>
-            {addresses.map((addr) => {
-              const active = addr.id === selectedAddressId;
-              return (
-                <Pressable
-                  key={addr.id}
-                  onPress={() => setSelectedAddressId(addr.id)}
-                  style={[styles.addrPick, active && styles.addrPickActive]}
-                >
-                  <View style={styles.rowBetween}>
-                    <Text style={styles.itemName}>{addr.name}</Text>
-                    {addr.isDefault ? <StatusBadge label="Mặc định" tone="accent" /> : null}
-                  </View>
-                  <Text style={styles.itemMeta}>{addr.phone}</Text>
-                  <Text style={styles.addrBody}>{addr.addressText}</Text>
-                </Pressable>
-              );
-            })}
+      <FadeSlideIn delay={50} distance={12}>
+        <View style={[styles.summaryCard, shadows.card]}>
+          <View style={styles.rowBetween}>
+            <Text style={styles.sectionHeading}>Địa chỉ giao hàng</Text>
+            <EditorialButton
+              label="Quản lý địa chỉ"
+              variant="ghost"
+              compact
+              onPress={() => navigate({ name: 'addresses' })}
+            />
           </View>
-        )}
-      </View>
+          {addresses.length === 0 ? (
+            <StateCard
+              kind="empty"
+              title="Chưa có địa chỉ giao hàng"
+              message="Bạn cần tạo ít nhất một địa chỉ trước khi đặt đơn."
+              actionLabel="Thêm địa chỉ ngay"
+              onAction={() => navigate({ name: 'addresses' })}
+            />
+          ) : (
+            <View style={styles.addrOptions}>
+              {addresses.map((addr) => {
+                const active = addr.id === selectedAddressId;
+                return (
+                  <InteractiveCard
+                    key={addr.id}
+                    onPress={() => setSelectedAddressId(addr.id)}
+                    style={[styles.addrPick, active && styles.addrPickActive]}
+                  >
+                    <View style={styles.rowBetween}>
+                      <Text style={styles.itemName}>{addr.name}</Text>
+                      {addr.isDefault ? <StatusBadge label="Mặc định" tone="accent" /> : null}
+                    </View>
+                    <Text style={styles.itemMeta}>{addr.phone}</Text>
+                    <Text style={styles.addrBody}>{addr.addressText}</Text>
+                  </InteractiveCard>
+                );
+              })}
+            </View>
+          )}
+        </View>
+      </FadeSlideIn>
 
       {/* Order Snapshot Preview */}
-      <View style={styles.summaryCard}>
-        <Text style={styles.sectionHeading}>Tóm tắt đơn hàng</Text>
-        {cart.items.map((item) => (
-          <View key={item.variantId} style={styles.rowBetween}>
-            <Text style={styles.itemMeta}>
-              Biến thể #{item.variantId} × {item.quantity}
-            </Text>
-            <Text style={styles.summaryMuted}>{formatVnd(item.lineTotal)}</Text>
+      <FadeSlideIn delay={90} distance={12}>
+        <View style={[styles.summaryCard, shadows.card]}>
+          <Text style={styles.sectionHeading}>Tóm tắt đơn hàng</Text>
+          {cart.items.map((item) => (
+            <View key={item.variantId} style={styles.rowBetween}>
+              <Text style={styles.itemMeta}>
+                Biến thể #{item.variantId} × {item.quantity}
+              </Text>
+              <Text style={styles.summaryMuted}>{formatVnd(item.lineTotal)}</Text>
+            </View>
+          ))}
+          <View style={styles.divider} />
+          <View style={styles.rowBetween}>
+            <Text style={styles.summaryMuted}>Tạm tính</Text>
+            <Text style={styles.summaryMuted}>{formatVnd(cart.subtotal)}</Text>
           </View>
-        ))}
-        <View style={styles.divider} />
-        <View style={styles.rowBetween}>
-          <Text style={styles.summaryMuted}>Tạm tính</Text>
-          <Text style={styles.summaryMuted}>{formatVnd(cart.subtotal)}</Text>
+          <View style={styles.rowBetween}>
+            <Text style={styles.summaryMuted}>Phí giao hàng (Demo)</Text>
+            <Text style={styles.summaryMuted}>0 ₫</Text>
+          </View>
+          <View style={styles.rowBetween}>
+            <Text style={styles.summaryLabel}>Tổng thanh toán COD</Text>
+            <Text style={styles.summaryValue}>{formatVnd(cart.subtotal)}</Text>
+          </View>
+          <Text style={styles.idemMeta}>Idempotency-Key: {idempotencyKey}</Text>
         </View>
-        <View style={styles.rowBetween}>
-          <Text style={styles.summaryMuted}>Phí giao hàng (Demo)</Text>
-          <Text style={styles.summaryMuted}>0 ₫</Text>
-        </View>
-        <View style={styles.rowBetween}>
-          <Text style={styles.summaryLabel}>Tổng thanh toán COD</Text>
-          <Text style={styles.summaryValue}>{formatVnd(cart.subtotal)}</Text>
-        </View>
-        <Text style={styles.idemMeta}>Idempotency-Key: {idempotencyKey}</Text>
-      </View>
+      </FadeSlideIn>
 
       {checkoutError ? (
         <View style={styles.errorBanner}>
@@ -505,54 +520,56 @@ export function OrderSuccessScreen({
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <View style={styles.summaryCard}>
-        <View style={styles.rowBetween}>
-          <StatusBadge
-            label={replayed ? '200 Replay (Idempotent)' : '201 Đã tạo đơn'}
-            tone="success"
-          />
-          <StatusBadge label="COD mô phỏng" tone="accent" />
-        </View>
-        <Text style={styles.title}>Đặt hàng thành công · Đơn #{order.id}</Text>
-        <Text style={styles.noticeBody}>
-          Đơn hàng đã được ghi nhận lúc {formatDateTime(order.createdAt)}. Trạng thái hiện tại:{' '}
-          {order.status} · Thanh toán: {order.paymentStatus}.
-        </Text>
-
-        <View style={styles.divider} />
-        <Text style={styles.sectionHeading}>Người nhận (Snapshot bất biến)</Text>
-        <Text style={styles.itemName}>{order.address.name}</Text>
-        <Text style={styles.itemMeta}>{order.address.phone}</Text>
-        <Text style={styles.addrBody}>{order.address.addressText}</Text>
-
-        <View style={styles.divider} />
-        {order.items.map((line) => (
-          <View key={line.id} style={styles.rowBetween}>
-            <Text style={styles.itemMeta}>
-              {line.name} ({line.size}/{line.color}) × {line.quantity}
-            </Text>
-            <Text style={styles.summaryMuted}>{formatVnd(line.lineTotal)}</Text>
+      <FadeSlideIn distance={16} duration={400}>
+        <View style={[styles.summaryCard, shadows.lifted]}>
+          <View style={styles.rowBetween}>
+            <StatusBadge
+              label={replayed ? '200 Replay (Idempotent)' : '201 Đã tạo đơn'}
+              tone="success"
+            />
+            <StatusBadge label="COD mô phỏng" tone="accent" />
           </View>
-        ))}
+          <Text style={styles.title}>Đặt hàng thành công · Đơn #{order.id}</Text>
+          <Text style={styles.noticeBody}>
+            Đơn hàng đã được ghi nhận lúc {formatDateTime(order.createdAt)}. Trạng thái hiện tại:{' '}
+            {order.status} · Thanh toán: {order.paymentStatus}.
+          </Text>
 
-        <View style={styles.divider} />
-        <View style={styles.rowBetween}>
-          <Text style={styles.summaryLabel}>Tổng cộng</Text>
-          <Text style={styles.summaryValue}>{formatVnd(order.total)}</Text>
-        </View>
+          <View style={styles.divider} />
+          <Text style={styles.sectionHeading}>Người nhận (Snapshot bất biến)</Text>
+          <Text style={styles.itemName}>{order.address.name}</Text>
+          <Text style={styles.itemMeta}>{order.address.phone}</Text>
+          <Text style={styles.addrBody}>{order.address.addressText}</Text>
 
-        <View style={styles.checkoutActions}>
-          <EditorialButton
-            label="Xem chi tiết đơn hàng"
-            onPress={() => navigate({ name: 'order-detail', orderId: order.id })}
-          />
-          <EditorialButton
-            label="Tiếp tục xem catalog"
-            variant="secondary"
-            onPress={() => navigate({ name: 'catalog' })}
-          />
+          <View style={styles.divider} />
+          {order.items.map((line) => (
+            <View key={line.id} style={styles.rowBetween}>
+              <Text style={styles.itemMeta}>
+                {line.name} ({line.size}/{line.color}) × {line.quantity}
+              </Text>
+              <Text style={styles.summaryMuted}>{formatVnd(line.lineTotal)}</Text>
+            </View>
+          ))}
+
+          <View style={styles.divider} />
+          <View style={styles.rowBetween}>
+            <Text style={styles.summaryLabel}>Tổng cộng</Text>
+            <Text style={styles.summaryValue}>{formatVnd(order.total)}</Text>
+          </View>
+
+          <View style={styles.checkoutActions}>
+            <EditorialButton
+              label="Xem chi tiết đơn hàng"
+              onPress={() => navigate({ name: 'order-detail', orderId: order.id })}
+            />
+            <EditorialButton
+              label="Tiếp tục xem catalog"
+              variant="secondary"
+              onPress={() => navigate({ name: 'catalog' })}
+            />
+          </View>
         </View>
-      </View>
+      </FadeSlideIn>
     </ScrollView>
   );
 }
@@ -568,20 +585,20 @@ const styles = StyleSheet.create({
     gap: spacing.lg,
     paddingBottom: spacing.xxxl,
   },
-  title: { fontFamily: typography.serif, fontSize: 24, color: colors.ink },
+  title: { fontFamily: typography.serif, fontSize: 25, color: colors.ink },
   sectionHeading: { fontFamily: typography.sans, fontSize: 15, fontWeight: '700', color: colors.ink },
   list: { gap: spacing.md },
   cartRow: {
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.sm,
+    borderRadius: radius.lg,
     padding: spacing.md,
     flexDirection: 'row',
     gap: spacing.md,
     alignItems: 'center',
   },
-  cartThumb: { width: 82 },
+  cartThumb: { width: 86 },
   cartInfo: { flex: 1, gap: 4 },
   itemName: { fontFamily: typography.sans, fontSize: 15, fontWeight: '600', color: colors.ink },
   itemMeta: { fontFamily: typography.sans, fontSize: 13, color: colors.muted },
@@ -590,9 +607,11 @@ const styles = StyleSheet.create({
   stepper: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-    borderRadius: radius.xs,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceSoft,
+    paddingHorizontal: 3,
   },
   stepBtn: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
   stepText: { fontSize: 15, fontWeight: '600', color: colors.ink },
@@ -604,7 +623,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontVariant: ['tabular-nums'],
   },
-  lineTotalCol: { alignItems: 'flex-end' },
+  lineTotalCol: { alignItems: 'flex-end', paddingRight: spacing.xs },
   lineTotal: {
     fontFamily: typography.sans,
     fontSize: 15,
@@ -616,7 +635,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.sm,
+    borderRadius: radius.lg,
     padding: spacing.xl,
     gap: spacing.sm,
   },
@@ -629,7 +648,7 @@ const styles = StyleSheet.create({
   summaryLabel: { fontFamily: typography.sans, fontSize: 15, fontWeight: '700', color: colors.ink },
   summaryValue: {
     fontFamily: typography.sans,
-    fontSize: 20,
+    fontSize: 21,
     fontWeight: '700',
     color: colors.accent,
     fontVariant: ['tabular-nums'],
@@ -643,18 +662,19 @@ const styles = StyleSheet.create({
   noticeBox: {
     backgroundColor: colors.accentSoft,
     borderWidth: 1,
-    borderColor: '#C9D8EA',
-    borderRadius: radius.sm,
+    borderColor: '#CFDAEC',
+    borderRadius: radius.md,
     padding: spacing.lg,
     gap: 4,
   },
   noticeTitle: { fontFamily: typography.sans, fontSize: 13, fontWeight: '700', color: colors.accent },
-  noticeBody: { fontFamily: typography.sans, fontSize: 13, lineHeight: 19, color: colors.ink },
+  noticeBody: { fontFamily: typography.sans, fontSize: 13, lineHeight: 20, color: colors.ink },
   addrOptions: { gap: spacing.sm },
   addrPick: {
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: colors.border,
-    borderRadius: radius.xs,
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceSoft,
     padding: spacing.md,
     gap: 3,
   },
@@ -673,8 +693,8 @@ const styles = StyleSheet.create({
   errorBanner: {
     backgroundColor: colors.dangerSoft,
     borderWidth: 1,
-    borderColor: '#EABEC4',
-    borderRadius: radius.sm,
+    borderColor: '#F0C5CD',
+    borderRadius: radius.md,
     padding: spacing.lg,
   },
   errorBannerText: { fontFamily: typography.sans, fontSize: 13, color: colors.danger },
