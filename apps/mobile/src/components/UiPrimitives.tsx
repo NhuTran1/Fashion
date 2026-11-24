@@ -139,15 +139,18 @@ export function GarmentArtwork({
   uri,
   altText,
   height = 220,
+  aspectRatio,
   hideCaption = false,
 }: {
   uri?: string;
   altText: string;
   height?: number;
+  aspectRatio?: number;
   hideCaption?: boolean;
 }): React.ReactElement {
   const [imgFailed, setImgFailed] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const sizeStyle: ViewStyle = aspectRatio ? { aspectRatio } : { height };
 
   if (uri && uri.startsWith('garment://')) {
     const [, rawTone = '%231E3A5F', rawSil = 'shirt', rawTitle = 'SỞI'] = uri.split('://')[1]
@@ -169,7 +172,7 @@ export function GarmentArtwork({
 
     return (
       <View
-        style={[styles.artContainer, { height, backgroundColor: toneHex }]}
+        style={[styles.artContainer, sizeStyle, { backgroundColor: toneHex }]}
         accessibilityLabel={altText}
       >
         {/* Layered ambient textile sheen circles */}
@@ -193,7 +196,7 @@ export function GarmentArtwork({
   if (!uri || imgFailed) {
     return (
       <View
-        style={[styles.artContainer, styles.artFallback, { height }]}
+        style={[styles.artContainer, styles.artFallback, sizeStyle]}
         accessibilityLabel={altText}
       >
         <Text style={styles.artFallbackText}>{altText || 'Ảnh sản phẩm'}</Text>
@@ -202,7 +205,7 @@ export function GarmentArtwork({
   }
 
   return (
-    <Animated.View style={[styles.artImageWrap, { height, opacity: fadeAnim }]}>
+    <Animated.View style={[styles.artImageWrap, sizeStyle, { opacity: fadeAnim }]}>
       <Image
         source={{ uri }}
         accessibilityLabel={altText}
@@ -214,7 +217,7 @@ export function GarmentArtwork({
           }).start()
         }
         onError={() => setImgFailed(true)}
-        style={[styles.artImage, { height }]}
+        style={[styles.artImage, { height: '100%' }]}
         resizeMode="cover"
       />
     </Animated.View>
@@ -479,50 +482,50 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 8,
   },
   silShirtBody: {
-    width: 60,
-    height: 64,
+    width: 78,
+    height: 112,
     borderWidth: 1.5,
-    borderRadius: 10,
-    padding: 10,
+    borderRadius: 12,
+    padding: 12,
     alignItems: 'flex-end',
   },
   silPocket: {
-    width: 14,
-    height: 15,
+    width: 18,
+    height: 20,
     borderWidth: 1,
-    borderRadius: 3,
-    marginTop: 6,
+    borderRadius: 4,
+    marginTop: 10,
   },
   silCoatBody: {
-    width: 66,
-    height: 74,
+    width: 84,
+    height: 132,
     borderWidth: 1.5,
-    borderRadius: 12,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },
   silSeamCenter: {
     width: 1,
-    height: '78%',
+    height: '82%',
   },
   silWaist: {
-    width: 50,
-    height: 12,
+    width: 62,
+    height: 16,
     borderWidth: 1.5,
-    borderTopLeftRadius: 4,
-    borderTopRightRadius: 4,
+    borderTopLeftRadius: 5,
+    borderTopRightRadius: 5,
   },
   silLegs: {
     flexDirection: 'row',
-    gap: 5,
+    gap: 6,
   },
   silLeg: {
-    width: 22,
-    height: 62,
+    width: 28,
+    height: 118,
     borderWidth: 1.5,
     borderTopWidth: 0,
-    borderBottomLeftRadius: 5,
-    borderBottomRightRadius: 5,
+    borderBottomLeftRadius: 6,
+    borderBottomRightRadius: 6,
   },
   stateCard: {
     backgroundColor: colors.surface,

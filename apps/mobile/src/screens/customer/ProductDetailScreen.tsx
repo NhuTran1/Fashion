@@ -184,12 +184,12 @@ export function ProductDetailScreen({ productId }: { productId: EntityId }): Rea
       <FadeSlideIn distance={14}>
         <View style={[styles.detailLayout, shadows.card, isWide && styles.detailLayoutWide]}>
           {/* Left column: Image gallery */}
-          <View style={[styles.galleryCol, isWide && { flex: 1 }]}>
+          <View style={[styles.galleryCol, isWide && { width: 440, maxWidth: '46%' }]}>
             <View style={shadows.soft}>
               <GarmentArtwork
                 uri={activeImage?.url}
                 altText={activeImage?.altText || product.name}
-                height={isWide ? 400 : 290}
+                aspectRatio={3 / 4}
               />
             </View>
             {product.images.length > 1 ? (
@@ -429,10 +429,8 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.canvas },
   pagePad: { padding: spacing.lg, maxWidth: 960, width: '100%', alignSelf: 'center' },
   content: {
-    padding: spacing.lg,
-    maxWidth: 1120,
+    padding: spacing.xl,
     width: '100%',
-    alignSelf: 'center',
     gap: spacing.lg,
     paddingBottom: spacing.xxxl,
   },

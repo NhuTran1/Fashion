@@ -267,10 +267,8 @@ const styles = StyleSheet.create({
       : {}),
   },
   headerInner: {
-    maxWidth: 1200,
     width: '100%',
-    alignSelf: 'center',
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.xl,
     paddingVertical: spacing.md,
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -351,9 +349,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
   },
   qaPanelInner: {
-    maxWidth: 1200,
     width: '100%',
-    alignSelf: 'center',
     gap: spacing.xs,
   },
   qaLabel: {
@@ -383,11 +379,9 @@ const styles = StyleSheet.create({
   qaChipText: { fontFamily: typography.sans, fontSize: 12, color: colors.ink },
   qaChipTextActive: { color: colors.warning, fontWeight: '700' },
   toastWrap: {
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.xl,
     paddingTop: spacing.sm,
-    maxWidth: 1200,
     width: '100%',
-    alignSelf: 'center',
   },
   toast: {
     backgroundColor: colors.ink,

@@ -3,7 +3,6 @@ import {
   Animated,
   Easing,
   Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,7 +10,6 @@ import {
   TextInput,
   useWindowDimensions,
   View,
-  ViewStyle,
 } from 'react-native';
 import { fashionApi } from '../../api/client';
 import {
@@ -41,11 +39,11 @@ const SORT_OPTIONS: Array<{ value: ProductSort; label: string }> = [
   { value: 'PRICE_DESC', label: 'Giá giảm dần' },
 ];
 
-const USE_NATIVE_DRIVER = Platform.OS !== 'web';
-
 /**
- * Customer storefront screen with breathable editorial hero, active-filter pills,
- * and a collapsible right-hand search & filter sidebar (docked on desktop, slide-over drawer on mobile).
+ * Full-screen Customer storefront featuring:
+ * - Edge-to-edge fluid product grid with tall 3:4 portrait garment rectangles
+ * - Full-height docked collapsible right-hand Search & Filter sidebar on desktop (zero scroll gap)
+ * - Right slide-over drawer on mobile/tablet
  */
 export function CatalogScreen(): React.ReactElement {
   const { navigate, handleApiError } = useApp();
@@ -66,21 +64,19 @@ export function CatalogScreen(): React.ReactElement {
   const [selectedColor, setSelectedColor] = useState<string | undefined>(undefined);
   const [sort, setSort] = useState<ProductSort>('NEWEST');
 
-  // Default open on wide screens so the right sidebar is immediately accessible, closed on compact screens.
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(width >= 920);
 
   const [loading, setLoading] = useState<boolean>(true);
   const [loadingMore, setLoadingMore] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Smooth horizontal entrance animation for the right sidebar.
-  const sidebarAnim = useRef(new Animated.Value(1)).current;
+  const sidebarAnim = useRef(new Animated.Value(sidebarOpen ? 1 : 0)).current;
   useEffect(() => {
     Animated.timing(sidebarAnim, {
       toValue: sidebarOpen ? 1 : 0,
       duration: 240,
       easing: Easing.out(Easing.cubic),
-      useNativeDriver: USE_NATIVE_DRIVER,
+      useNativeDriver: false,
     }).start();
   }, [sidebarAnim, sidebarOpen]);
 
@@ -151,20 +147,27 @@ export function CatalogScreen(): React.ReactElement {
     (selectedColor ? 1 : 0) +
     (sort !== 'NEWEST' ? 1 : 0);
 
-  // Reflow grid columns smoothly depending on screen width and whether right sidebar is open.
+  // Adaptive full-screen column layout depending on viewport width and sidebar state.
   const columns = isDesktop
     ? sidebarOpen
-      ? width >= 1140
-        ? 3
-        : 2
-      : 3
+      ? width >= 1380
+        ? 4
+        : width >= 1060
+          ? 3
+          : 2
+      : width >= 1280
+        ? 4
+        : 3
     : width >= 620
       ? 2
       : 1;
 
+  const cardWidthPercent: `${number}%` =
+    columns === 4 ? '23.8%' : columns === 3 ? '32.2%' : columns === 2 ? '48.8%' : '100%';
+
   const selectedCategoryName = categories.find((c) => c.id === selectedCategoryId)?.name;
 
-  /** Reusable search & filter sidebar content shared by Desktop right rail and Mobile right drawer. */
+  /** Reusable search & filter sidebar content shared by Desktop full-height rail and Mobile drawer. */
   const renderFilterSidebarContent = () => (
     <View style={styles.sidebarBody}>
       <View style={styles.sidebarHeader}>
@@ -272,7 +275,7 @@ export function CatalogScreen(): React.ReactElement {
       </View>
 
       {/* Sort options */}
-      <View style={styles.sidebarSection}>
+      <View style={styles.sidebarSectionLast}>
         <Text style={styles.subLabel}>Sắp xếp</Text>
         <View style={styles.chipRow}>
           {SORT_OPTIONS.map((opt) => (
@@ -298,9 +301,10 @@ export function CatalogScreen(): React.ReactElement {
   );
 
   return (
-    <View style={styles.pageRoot}>
+    <View style={[styles.pageRoot, isDesktop && styles.pageRootDesktop]}>
+      {/* Left/Main Full-Screen Scrollable Catalog */}
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-        {/* Compact breathable lookbook hero keeping catalog visible above the fold */}
+        {/* Full-width editorial lookbook hero */}
         <FadeSlideIn distance={14} duration={380}>
           <View style={[styles.hero, shadows.card]}>
             <View style={styles.heroGlowRight} />
@@ -329,7 +333,7 @@ export function CatalogScreen(): React.ReactElement {
                   <GarmentArtwork
                     uri="garment://%231E3A5F/coat/Atelier%20Lookbook"
                     altText="Bộ sưu tập Sợi Atelier"
-                    height={168}
+                    height={210}
                   />
                 </View>
               </FloatingAmbient>
@@ -337,232 +341,222 @@ export function CatalogScreen(): React.ReactElement {
           </View>
         </FadeSlideIn>
 
-        {/* Main split workspace: Catalog grid on left + Collapsible Search Sidebar on right */}
-        <View style={[styles.workspaceRow, isDesktop && styles.workspaceRowDesktop]}>
-          {/* Left/Main Product Column */}
-          <View style={styles.catalogColumn}>
-            {/* Toolbar with product count, active filter summary pills, and right-aligned Toggle Button */}
-            <View style={[styles.toolbarCard, shadows.soft]}>
-              <View style={styles.toolbarTop}>
-                <View style={styles.toolbarMeta}>
-                  <Text style={styles.resultCount}>
-                    {loading ? 'Đang tải danh mục sản phẩm...' : `${total} sản phẩm đang mở bán`}
-                  </Text>
-                </View>
-
-                <Pressable
-                  onPress={() => setSidebarOpen((open) => !open)}
-                  style={[styles.toggleSidebarBtn, sidebarOpen && styles.toggleSidebarBtnActive]}
-                  accessibilityRole="button"
-                  accessibilityLabel={sidebarOpen ? 'Ẩn thanh tìm kiếm' : 'Mở thanh tìm kiếm'}
-                >
-                  <Text
-                    style={[
-                      styles.toggleSidebarText,
-                      sidebarOpen && styles.toggleSidebarTextActive,
-                    ]}
-                  >
-                    {sidebarOpen ? 'Ẩn bộ lọc' : 'Tìm kiếm & Lọc'}
-                    {!sidebarOpen && activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
-                  </Text>
-                </Pressable>
-              </View>
-
-              {/* Active Filter Summary Chips (dismissible even when sidebar is closed) */}
-              {activeFilterCount > 0 ? (
-                <View style={styles.activeFilterRow}>
-                  {appliedQ ? (
-                    <ActiveFilterTag
-                      label={`Từ khóa: "${appliedQ}"`}
-                      onRemove={() => {
-                        setSearchInput('');
-                        setAppliedQ('');
-                      }}
-                    />
-                  ) : null}
-                  {selectedCategoryName ? (
-                    <ActiveFilterTag
-                      label={`Danh mục: ${selectedCategoryName}`}
-                      onRemove={() => setSelectedCategoryId(undefined)}
-                    />
-                  ) : null}
-                  {selectedSize ? (
-                    <ActiveFilterTag
-                      label={`Size: ${selectedSize}`}
-                      onRemove={() => setSelectedSize(undefined)}
-                    />
-                  ) : null}
-                  {selectedColor ? (
-                    <ActiveFilterTag
-                      label={`Màu: ${selectedColor}`}
-                      onRemove={() => setSelectedColor(undefined)}
-                    />
-                  ) : null}
-                  {sort !== 'NEWEST' ? (
-                    <ActiveFilterTag
-                      label={`Xếp: ${SORT_OPTIONS.find((s) => s.value === sort)?.label ?? sort}`}
-                      onRemove={() => setSort('NEWEST')}
-                    />
-                  ) : null}
-                </View>
-              ) : null}
+        {/* Toolbar with product count, active filter summary pills, and right-aligned Toggle Button */}
+        <View style={[styles.toolbarCard, shadows.soft]}>
+          <View style={styles.toolbarTop}>
+            <View style={styles.toolbarMeta}>
+              <Text style={styles.resultCount}>
+                {loading ? 'Đang tải danh mục sản phẩm...' : `${total} sản phẩm đang mở bán`}
+              </Text>
             </View>
 
-            {/* Product Grid / Shimmer Skeleton / Empty / Error */}
-            {loading && products.length === 0 ? (
-              <View style={styles.grid}>
-                {[0, 1, 2].map((idx) => {
-                  const cardWidthPercent =
-                    columns === 3 ? '31.8%' : columns === 2 ? '48.5%' : '100%';
-                  return (
-                    <View
-                      key={idx}
-                      style={[styles.skeletonCard, shadows.soft, { width: cardWidthPercent }]}
-                    >
-                      <ShimmerBlock height={210} borderRadius={radius.md} />
-                      <ShimmerBlock height={18} width="75%" borderRadius={radius.pill} />
-                      <ShimmerBlock height={14} width="45%" borderRadius={radius.pill} />
-                    </View>
-                  );
-                })}
-              </View>
-            ) : error && products.length === 0 ? (
-              <StateCard
-                kind="error"
-                title="Không thể tải catalog"
-                message={error}
-                actionLabel="Thử lại"
-                onAction={() => void fetchProducts(1, false)}
-              />
-            ) : products.length === 0 ? (
-              <StateCard
-                kind="empty"
-                title="Không có sản phẩm phù hợp"
-                message="Hãy điều chỉnh từ khóa hoặc xóa bộ lọc hiện tại để xem lại toàn bộ thiết kế."
-                actionLabel="Xóa bộ lọc"
-                onAction={clearFilters}
-              />
-            ) : (
-              <>
-                {error ? (
-                  <StateCard
-                    kind="error"
-                    title="Lỗi làm mới dữ liệu"
-                    message={error}
-                    actionLabel="Thử lại"
-                    onAction={() => void fetchProducts(page, false)}
-                  />
-                ) : null}
-
-                <View style={styles.grid}>
-                  {products.map((product, idx) => {
-                    const lowestPrice = getLowestActivePrice(product);
-                    const totalStock = getTotalActiveStock(product);
-                    const uniqueColors = Array.from(new Set(product.variants.map((v) => v.color)));
-                    const cardWidthPercent =
-                      columns === 3 ? '31.8%' : columns === 2 ? '48.5%' : '100%';
-
-                    return (
-                      <FadeSlideIn
-                        key={product.id}
-                        delay={Math.min(idx * 45, 220)}
-                        distance={14}
-                        style={{ width: cardWidthPercent }}
-                      >
-                        <InteractiveCard
-                          onPress={() => navigate({ name: 'product', productId: product.id })}
-                          style={styles.card}
-                          accessibilityLabel={product.name}
-                        >
-                          <GarmentArtwork
-                            uri={product.images[0]?.url}
-                            altText={product.images[0]?.altText || product.name}
-                            height={212}
-                          />
-                          <View style={styles.cardBody}>
-                            <Text style={styles.cardTitle} numberOfLines={1}>
-                              {product.name}
-                            </Text>
-                            <View style={styles.cardMetaRow}>
-                              <Text style={styles.cardPrice}>{formatVnd(lowestPrice)}</Text>
-                              <View
-                                style={[
-                                  styles.stockPill,
-                                  totalStock === 0 && { backgroundColor: colors.dangerSoft },
-                                ]}
-                              >
-                                <Text
-                                  style={[
-                                    styles.cardStock,
-                                    totalStock === 0 && { color: colors.danger },
-                                  ]}
-                                >
-                                  {totalStock > 0 ? `Còn ${totalStock}` : 'Tạm hết hàng'}
-                                </Text>
-                              </View>
-                            </View>
-                            <View style={styles.swatchRow}>
-                              {uniqueColors.map((clr) => (
-                                <View key={clr} style={styles.swatchItem}>
-                                  <View
-                                    style={[
-                                      styles.swatchDot,
-                                      { backgroundColor: resolveColorSwatch(clr) },
-                                    ]}
-                                  />
-                                  <Text style={styles.swatchText}>{clr}</Text>
-                                </View>
-                              ))}
-                            </View>
-                          </View>
-                        </InteractiveCard>
-                      </FadeSlideIn>
-                    );
-                  })}
-                </View>
-
-                {products.length < total ? (
-                  <View style={styles.loadMoreWrap}>
-                    <EditorialButton
-                      label={
-                        loadingMore ? 'Đang tải thêm...' : `Tải thêm (${products.length}/${total})`
-                      }
-                      variant="secondary"
-                      loading={loadingMore}
-                      onPress={() => void fetchProducts(page + 1, true)}
-                    />
-                  </View>
-                ) : null}
-              </>
-            )}
+            <Pressable
+              onPress={() => setSidebarOpen((open) => !open)}
+              style={[styles.toggleSidebarBtn, sidebarOpen && styles.toggleSidebarBtnActive]}
+              accessibilityRole="button"
+              accessibilityLabel={sidebarOpen ? 'Ẩn thanh tìm kiếm' : 'Mở thanh tìm kiếm'}
+            >
+              <Text
+                style={[
+                  styles.toggleSidebarText,
+                  sidebarOpen && styles.toggleSidebarTextActive,
+                ]}
+              >
+                {sidebarOpen ? 'Ẩn bộ lọc' : 'Tìm kiếm & Lọc'}
+                {!sidebarOpen && activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
+              </Text>
+            </Pressable>
           </View>
 
-          {/* Desktop Right-Hand Collapsible Sticky Sidebar */}
-          {isDesktop && sidebarOpen ? (
-            <Animated.View
-              style={[
-                styles.desktopSidebar,
-                shadows.card,
-                {
-                  opacity: sidebarAnim,
-                  transform: [
-                    {
-                      translateX: sidebarAnim.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [24, 0],
-                      }),
-                    },
-                  ],
-                },
-              ]}
-            >
-              {renderFilterSidebarContent()}
-            </Animated.View>
+          {activeFilterCount > 0 ? (
+            <View style={styles.activeFilterRow}>
+              {appliedQ ? (
+                <ActiveFilterTag
+                  label={`Từ khóa: "${appliedQ}"`}
+                  onRemove={() => {
+                    setSearchInput('');
+                    setAppliedQ('');
+                  }}
+                />
+              ) : null}
+              {selectedCategoryName ? (
+                <ActiveFilterTag
+                  label={`Danh mục: ${selectedCategoryName}`}
+                  onRemove={() => setSelectedCategoryId(undefined)}
+                />
+              ) : null}
+              {selectedSize ? (
+                <ActiveFilterTag
+                  label={`Size: ${selectedSize}`}
+                  onRemove={() => setSelectedSize(undefined)}
+                />
+              ) : null}
+              {selectedColor ? (
+                <ActiveFilterTag
+                  label={`Màu: ${selectedColor}`}
+                  onRemove={() => setSelectedColor(undefined)}
+                />
+              ) : null}
+              {sort !== 'NEWEST' ? (
+                <ActiveFilterTag
+                  label={`Xếp: ${SORT_OPTIONS.find((s) => s.value === sort)?.label ?? sort}`}
+                  onRemove={() => setSort('NEWEST')}
+                />
+              ) : null}
+            </View>
           ) : null}
         </View>
+
+        {/* Tall 3:4 Portrait Rectangular Product Grid */}
+        {loading && products.length === 0 ? (
+          <View style={styles.grid}>
+            {[0, 1, 2].map((idx) => (
+              <View
+                key={idx}
+                style={[styles.skeletonCard, shadows.soft, { width: cardWidthPercent }]}
+              >
+                <ShimmerBlock height={320} borderRadius={radius.md} />
+                <ShimmerBlock height={18} width="75%" borderRadius={radius.pill} />
+                <ShimmerBlock height={14} width="45%" borderRadius={radius.pill} />
+              </View>
+            ))}
+          </View>
+        ) : error && products.length === 0 ? (
+          <StateCard
+            kind="error"
+            title="Không thể tải catalog"
+            message={error}
+            actionLabel="Thử lại"
+            onAction={() => void fetchProducts(1, false)}
+          />
+        ) : products.length === 0 ? (
+          <StateCard
+            kind="empty"
+            title="Không có sản phẩm phù hợp"
+            message="Hãy điều chỉnh từ khóa hoặc xóa bộ lọc hiện tại để xem lại toàn bộ thiết kế."
+            actionLabel="Xóa bộ lọc"
+            onAction={clearFilters}
+          />
+        ) : (
+          <>
+            {error ? (
+              <StateCard
+                kind="error"
+                title="Lỗi làm mới dữ liệu"
+                message={error}
+                actionLabel="Thử lại"
+                onAction={() => void fetchProducts(page, false)}
+              />
+            ) : null}
+
+            <View style={styles.grid}>
+              {products.map((product, idx) => {
+                const lowestPrice = getLowestActivePrice(product);
+                const totalStock = getTotalActiveStock(product);
+                const uniqueColors = Array.from(new Set(product.variants.map((v) => v.color)));
+
+                return (
+                  <FadeSlideIn
+                    key={product.id}
+                    delay={Math.min(idx * 45, 220)}
+                    distance={14}
+                    style={{ width: cardWidthPercent }}
+                  >
+                    <InteractiveCard
+                      onPress={() => navigate({ name: 'product', productId: product.id })}
+                      style={styles.card}
+                      accessibilityLabel={product.name}
+                    >
+                      <GarmentArtwork
+                        uri={product.images[0]?.url}
+                        altText={product.images[0]?.altText || product.name}
+                        aspectRatio={3 / 4}
+                      />
+                      <View style={styles.cardBody}>
+                        <Text style={styles.cardTitle} numberOfLines={1}>
+                          {product.name}
+                        </Text>
+                        <View style={styles.cardMetaRow}>
+                          <Text style={styles.cardPrice}>{formatVnd(lowestPrice)}</Text>
+                          <View
+                            style={[
+                              styles.stockPill,
+                              totalStock === 0 && { backgroundColor: colors.dangerSoft },
+                            ]}
+                          >
+                            <Text
+                              style={[
+                                styles.cardStock,
+                                totalStock === 0 && { color: colors.danger },
+                              ]}
+                            >
+                              {totalStock > 0 ? `Còn ${totalStock}` : 'Tạm hết hàng'}
+                            </Text>
+                          </View>
+                        </View>
+                        <View style={styles.swatchRow}>
+                          {uniqueColors.map((clr) => (
+                            <View key={clr} style={styles.swatchItem}>
+                              <View
+                                style={[
+                                  styles.swatchDot,
+                                  { backgroundColor: resolveColorSwatch(clr) },
+                                ]}
+                              />
+                              <Text style={styles.swatchText}>{clr}</Text>
+                            </View>
+                          ))}
+                        </View>
+                      </View>
+                    </InteractiveCard>
+                  </FadeSlideIn>
+                );
+              })}
+            </View>
+
+            {products.length < total ? (
+              <View style={styles.loadMoreWrap}>
+                <EditorialButton
+                  label={
+                    loadingMore ? 'Đang tải thêm...' : `Tải thêm (${products.length}/${total})`
+                  }
+                  variant="secondary"
+                  loading={loadingMore}
+                  onPress={() => void fetchProducts(page + 1, true)}
+                />
+              </View>
+            ) : null}
+          </>
+        )}
       </ScrollView>
 
-      {/* Mobile/Tablet Right Slide-Over Drawer Modal when user opens filter on narrow screens */}
+      {/* Full-height Docked Right Sidebar on Desktop — flush with header, zero scroll gap */}
+      {isDesktop ? (
+        <Animated.View
+          style={[
+            styles.desktopDockedSidebar,
+            {
+              width: sidebarAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0, 320],
+              }),
+              opacity: sidebarAnim,
+              borderLeftWidth: sidebarOpen ? 1 : 0,
+            },
+          ]}
+        >
+          {sidebarOpen ? (
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.dockedSidebarScroll}
+            >
+              {renderFilterSidebarContent()}
+            </ScrollView>
+          ) : null}
+        </Animated.View>
+      ) : null}
+
+      {/* Mobile/Tablet Right Slide-Over Drawer Modal */}
       {!isDesktop ? (
         <Modal
           visible={sidebarOpen}
@@ -636,15 +630,17 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.canvas,
   },
+  pageRootDesktop: {
+    flexDirection: 'row',
+    overflow: 'hidden',
+  },
   container: {
     flex: 1,
     backgroundColor: colors.canvas,
   },
   content: {
-    padding: spacing.lg,
-    maxWidth: 1240,
+    padding: spacing.xl,
     width: '100%',
-    alignSelf: 'center',
     gap: spacing.lg,
     paddingBottom: spacing.xxxl,
   },
@@ -662,63 +658,51 @@ const styles = StyleSheet.create({
   },
   heroGlowRight: {
     position: 'absolute',
-    width: 300,
-    height: 300,
+    width: 340,
+    height: 340,
     borderRadius: 999,
     backgroundColor: colors.accentSoft,
-    top: -130,
+    top: -150,
     right: -70,
     opacity: 0.72,
   },
   heroGlowBottom: {
     position: 'absolute',
-    width: 200,
-    height: 200,
+    width: 220,
+    height: 220,
     borderRadius: 999,
     backgroundColor: colors.warmHighlight,
-    bottom: -110,
+    bottom: -120,
     left: 40,
     opacity: 0.65,
   },
   heroCopy: {
-    flex: 1.5,
+    flex: 1.6,
     gap: spacing.sm,
     zIndex: 2,
   },
   heroVisual: {
-    flex: 0.9,
+    width: 190,
     zIndex: 2,
   },
   heroTitle: {
     fontFamily: typography.serif,
-    fontSize: 28,
-    lineHeight: 35,
+    fontSize: 30,
+    lineHeight: 38,
     color: colors.ink,
   },
   heroSubtitle: {
     fontFamily: typography.sans,
     fontSize: 14,
-    lineHeight: 21,
+    lineHeight: 22,
     color: colors.muted,
-    maxWidth: 560,
+    maxWidth: 620,
   },
   heroActions: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.sm,
     marginTop: spacing.xs,
-  },
-  workspaceRow: {
-    gap: spacing.lg,
-  },
-  workspaceRowDesktop: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-  },
-  catalogColumn: {
-    flex: 1,
-    gap: spacing.lg,
-    minWidth: 0,
   },
   toolbarCard: {
     backgroundColor: colors.surface,
@@ -786,16 +770,14 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.accent,
   },
-  desktopSidebar: {
-    width: 312,
+  desktopDockedSidebar: {
     backgroundColor: colors.surface,
-    borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.lg,
+    overflow: 'hidden',
+  },
+  dockedSidebarScroll: {
     padding: spacing.lg,
-    ...(Platform.OS === 'web'
-      ? ({ position: 'sticky', top: 82 } as unknown as ViewStyle)
-      : {}),
+    paddingBottom: spacing.xxxl,
   },
   sidebarBody: {
     gap: spacing.md,
@@ -835,7 +817,7 @@ const styles = StyleSheet.create({
   },
   closeSidebarBtn: {
     paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
+    paddingVertical: 5,
     borderRadius: radius.pill,
     backgroundColor: colors.surfaceAlt,
   },
@@ -847,9 +829,12 @@ const styles = StyleSheet.create({
   },
   sidebarSection: {
     gap: spacing.xs,
-    paddingBottom: spacing.sm,
+    paddingBottom: spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
+  },
+  sidebarSectionLast: {
+    gap: spacing.xs,
   },
   searchInputWrap: {
     flexDirection: 'row',

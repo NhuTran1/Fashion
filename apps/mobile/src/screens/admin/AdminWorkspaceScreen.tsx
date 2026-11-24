@@ -150,14 +150,12 @@ const styles = StyleSheet.create({
   shell: {
     flex: 1,
     backgroundColor: colors.canvas,
-    maxWidth: 1200,
     width: '100%',
-    alignSelf: 'center',
   },
   shellWide: {
     flexDirection: 'row',
     gap: spacing.lg,
-    padding: spacing.lg,
+    padding: spacing.xl,
   },
   rail: {
     backgroundColor: colors.surface,

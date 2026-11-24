@@ -316,3 +316,11 @@
   - `npm run typecheck --workspace apps/mobile` & `npm run typecheck --workspace apps/api`: PASS (0 errors).
   - `EXPO_NO_TELEMETRY=1 HOME=/tmp npx expo export --platform web --output-dir /tmp/fashion-web-dist`: PASS (299 modules, 744KB).
   - Playwright Chromium E2E Smoke Test (`http://127.0.0.1:4176`): PASS (`PLAYWRIGHT E2E WEB SMOKE TEST PASSED (0 errors)`), bao gồm đóng/mở sidebar tìm kiếm bên phải.
+
+
+## 2026-11-24 — Full-screen Layout, Flush Docked Sidebar & 3:4 Portrait Garment Proportions (Nhánh feat/frontend-expo-mock)
+- Scope: Gỡ giới hạn `maxWidth` trên Storefront (`AppShell`, `CatalogScreen`, `ProductDetailScreen`, `AdminWorkspaceScreen`) để hiển thị toàn màn hình; neo sidebar tìm kiếm bên phải full-height liền mạch ngay dưới header (không còn khoảng thừa phía trên khi cuộn); đổi tỉ lệ khung ảnh áo quần sang khối chữ nhật đứng `3:4` và kéo dài hình khối áo/quần trong `GarmentArtwork`.
+- Actual commands and results:
+  - `npm run typecheck --workspace apps/mobile` & `npm run typecheck --workspace apps/api`: PASS (0 errors).
+  - `EXPO_NO_TELEMETRY=1 HOME=/tmp npx expo export --platform web --output-dir /tmp/fashion-web-dist`: PASS (294 modules, 744KB).
+  - Playwright Chromium E2E Smoke Test (`1440x900`, `http://127.0.0.1:4177`): PASS (`PLAYWRIGHT E2E WEB SMOKE TEST PASSED (0 errors)`).
