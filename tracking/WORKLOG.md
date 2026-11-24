@@ -308,3 +308,11 @@
   - `node /tmp/fashion-mock-test/scripts/verifyMockContracts.js`: PASS (`ALL OPENAPI v1.0.0 & RBAC v1 MOCK CONTRACT CHECKS PASSED`).
   - `EXPO_NO_TELEMETRY=1 HOME=/tmp npx expo export --platform web --output-dir /tmp/fashion-web-dist`: PASS (294 modules, 731KB web bundle).
   - Playwright Chromium E2E Smoke Test (`http://127.0.0.1:4174`): PASS (`PLAYWRIGHT E2E WEB SMOKE TEST PASSED (0 errors)`).
+
+
+## 2026-11-24 — Catalog Right Collapsible Search Sidebar (Nhánh feat/frontend-expo-mock)
+- Scope: Chuyển khu vực tìm kiếm & bộ lọc Catalog sang sidebar bên phải tay người dùng (`CatalogScreen.tsx`): sticky panel đóng/mở mượt trên desktop (`>= 920px`) và right slide-over drawer trên màn hình nhỏ (`< 920px`), kèm chip tóm tắt bộ lọc đang bật có thể gỡ trực tiếp.
+- Actual commands and results:
+  - `npm run typecheck --workspace apps/mobile` & `npm run typecheck --workspace apps/api`: PASS (0 errors).
+  - `EXPO_NO_TELEMETRY=1 HOME=/tmp npx expo export --platform web --output-dir /tmp/fashion-web-dist`: PASS (299 modules, 744KB).
+  - Playwright Chromium E2E Smoke Test (`http://127.0.0.1:4176`): PASS (`PLAYWRIGHT E2E WEB SMOKE TEST PASSED (0 errors)`), bao gồm đóng/mở sidebar tìm kiếm bên phải.
