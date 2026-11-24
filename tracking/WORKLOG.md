@@ -344,3 +344,14 @@
   - `npm run typecheck --workspace apps/mobile` & `npm run typecheck --workspace apps/api`: PASS (0 errors).
   - `EXPO_NO_TELEMETRY=1 HOME=/tmp npx expo export --platform web --output-dir /tmp/fashion-web-dist`: PASS (301 modules, 777KB).
   - Playwright Chromium E2E Smoke Test (`1440x900`, `http://127.0.0.1:4180`): PASS (`PLAYWRIGHT E2E WEB SMOKE TEST PASSED (0 errors)`).
+
+
+## 2026-11-24 — Edge Reopen Handle, Centered Hover Icons & Carousel Arrows (Nhánh feat/frontend-expo-mock)
+- Scope:
+  - Bổ sung tab mở lại bộ lọc ngay mép phải (`‹ Bộ lọc`) khi thu gọn sidebar ([CatalogScreen.tsx](apps/mobile/src/screens/customer/CatalogScreen.tsx)).
+  - Căn giữa cụm nút hover trong khung `3:4`, tăng kích thước `48x48` kèm phóng to `scale: 1.18` khi rê chuột từng icon.
+  - Thêm nút cuộn ngang `‹` / `›` cho `Danh mục nổi bật`, `VoucherStrip` và `Bán chạy nhất hàng ngày`.
+- Actual commands and results:
+  - `npm run typecheck --workspace apps/mobile` & `npm run typecheck --workspace apps/api`: PASS (0 errors).
+  - `EXPO_NO_TELEMETRY=1 HOME=/tmp npx expo export --platform web --output-dir /tmp/fashion-web-dist`: PASS (295 modules, 782KB).
+  - Playwright Chromium E2E Smoke Test (`1440x900`, `http://127.0.0.1:4181`): PASS (`PLAYWRIGHT E2E WEB SMOKE TEST PASSED (0 errors)`).

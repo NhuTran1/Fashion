@@ -45,10 +45,11 @@ const SORT_OPTIONS: Array<{ value: ProductSort; label: string }> = [
 const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 
 /**
- * Full-screen Fashion Storefront supporting two distinct views:
- * - "home" (Trang chủ): Mint Hero -> Danh mục nổi bật -> VoucherStrip -> Bán chạy nhất -> Tất cả sản phẩm
- * - "products" (Sản phẩm): Dedicated atmospheric "Tất cả sản phẩm" banner with circular category shortcuts -> Product Grid
- * Both views feature multi-color interactive swatches, hover quick-actions, Quick View modal, and right filter sidebar.
+ * Full-screen Fashion Storefront supporting:
+ * - "home" (Trang chủ) & "products" (Sản phẩm) views
+ * - Horizontal carousels with left/right ‹ › scroll buttons for Categories, Vouchers, and Best Sellers
+ * - Centered scaling Hover Action icons on each product card
+ * - Sticky right-edge reopen handle whenever the Search/Filter sidebar is collapsed
  */
 export function CatalogScreen({
   viewMode = 'home',
@@ -87,6 +88,12 @@ export function CatalogScreen({
   const [loadingMore, setLoadingMore] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Horizontal carousel scroll refs & offsets
+  const catScrollRef = useRef<React.ComponentRef<typeof ScrollView>>(null);
+  const catScrollX = useRef<number>(0);
+  const bestScrollRef = useRef<React.ComponentRef<typeof ScrollView>>(null);
+  const bestScrollX = useRef<number>(0);
+
   useEffect(() => {
     if (externalSearch) {
       setSearchInput(externalSearch.q);
@@ -104,7 +111,7 @@ export function CatalogScreen({
     }).start();
   }, [sidebarAnim, sidebarOpen]);
 
-  /** Load ACTIVE categories and baseline active catalog for category counts & spotlight cards. */
+  /** Load ACTIVE categories and baseline active catalog for category counts & spotlight carousel. */
   const fetchCategoriesAndSpotlight = useCallback(async () => {
     try {
       const [catList, fullPage] = await Promise.all([
@@ -209,6 +216,17 @@ export function CatalogScreen({
     }
   };
 
+  /** Scroll a horizontal ScrollView smoothly by a pixel delta. */
+  const scrollHorizontal = (
+    ref: React.RefObject<React.ComponentRef<typeof ScrollView> | null>,
+    xTracker: React.MutableRefObject<number>,
+    delta: number,
+  ) => {
+    const nextX = Math.max(0, xTracker.current + delta);
+    xTracker.current = nextX;
+    ref.current?.scrollTo({ x: nextX, animated: true });
+  };
+
   const activeFilterCount =
     (appliedQ ? 1 : 0) +
     (selectedCategoryId ? 1 : 0) +
@@ -234,7 +252,6 @@ export function CatalogScreen({
     columns === 4 ? '23.8%' : columns === 3 ? '32.2%' : columns === 2 ? '48.8%' : '100%';
 
   const selectedCategoryName = categories.find((c) => c.id === selectedCategoryId)?.name;
-  const spotlightProducts = allActiveProducts.slice(0, 3);
 
   /** Bean Farm styled right-hand sidebar with emerald headers ("DANH MỤC SẢN PHẨM" & "BỘ LỌC SẢN PHẨM"). */
   const renderFilterSidebarContent = () => (
@@ -387,7 +404,7 @@ export function CatalogScreen({
       {/* Left/Main Full-Screen Scrollable Storefront */}
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
         {viewMode === 'products' ? (
-          /* Dedicated "Sản phẩm" Page Banner (Bean Farm Screenshot 1 style) */
+          /* Dedicated "Sản phẩm" Page Banner */
           <FadeSlideIn distance={12} duration={340}>
             <View style={[styles.productsBanner, shadows.card]}>
               <Text style={styles.productsBannerTitle}>
@@ -448,7 +465,7 @@ export function CatalogScreen({
             </View>
           </FadeSlideIn>
         ) : (
-          /* "Trang chủ" Mint Promotional Hero Banner + Danh mục nổi bật + Bán chạy nhất */
+          /* "Trang chủ" Mint Promotional Hero Banner + Danh mục nổi bật carousel */
           <>
             <FadeSlideIn distance={14} duration={360}>
               <View style={[styles.mintHero, shadows.card]}>
@@ -492,11 +509,37 @@ export function CatalogScreen({
               <View style={styles.sectionBlock}>
                 <View style={styles.sectionHeaderRow}>
                   <Text style={styles.sectionHeading}>Danh mục nổi bật</Text>
-                  <Pressable onPress={() => navigate({ name: 'catalog', view: 'products' })}>
-                    <Text style={styles.sectionLink}>Xem tất cả</Text>
-                  </Pressable>
+                  <View style={styles.carouselHeaderRight}>
+                    <Pressable onPress={() => navigate({ name: 'catalog', view: 'products' })}>
+                      <Text style={styles.sectionLink}>Xem tất cả</Text>
+                    </Pressable>
+                    <View style={styles.arrowGroup}>
+                      <Pressable
+                        onPress={() => scrollHorizontal(catScrollRef, catScrollX, -280)}
+                        style={styles.arrowBtn}
+                        accessibilityLabel="Danh mục trước"
+                      >
+                        <Text style={styles.arrowText}>‹</Text>
+                      </Pressable>
+                      <Pressable
+                        onPress={() => scrollHorizontal(catScrollRef, catScrollX, 280)}
+                        style={styles.arrowBtn}
+                        accessibilityLabel="Danh mục tiếp"
+                      >
+                        <Text style={styles.arrowText}>›</Text>
+                      </Pressable>
+                    </View>
+                  </View>
                 </View>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <ScrollView
+                  ref={catScrollRef}
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  scrollEventThrottle={16}
+                  onScroll={(e) => {
+                    catScrollX.current = e.nativeEvent.contentOffset.x;
+                  }}
+                >
                   <View style={styles.catStripRow}>
                     {categories.map((cat) => {
                       const catProducts = allActiveProducts.filter((p) => p.categoryId === cat.id);
@@ -532,16 +575,17 @@ export function CatalogScreen({
           </>
         )}
 
-        {/* Voucher Ticket Strip (Sudes Fashion inspired) shown on both Home and Products */}
+        {/* Voucher Ticket Strip */}
         <VoucherStrip />
 
-        {/* "Bán chạy nhất hàng ngày" Spotlight on Home view */}
-        {viewMode === 'home' && spotlightProducts.length > 0 && activeFilterCount === 0 ? (
+        {/* "Bán chạy nhất hàng ngày" Interactive Horizontal Carousel across all active models */}
+        {viewMode === 'home' && allActiveProducts.length > 0 && activeFilterCount === 0 ? (
           <View style={[styles.bestSellerPanel, shadows.card]}>
             <View style={styles.bestSellerPromo}>
               <Text style={styles.promoHeadline}>Bán chạy nhất hàng ngày</Text>
               <Text style={styles.promoSub}>
-                Ưu đãi độc quyền - Giá tốt từ 290.000₫. Đặt COD mô phỏng ngay hôm nay.
+                Ưu đãi độc quyền - Giá tốt từ 290.000₫. Lướt xem {allActiveProducts.length} mẫu thiết
+                kế nổi bật.
               </Text>
               <Pressable
                 onPress={() => navigate({ name: 'catalog', view: 'products' })}
@@ -551,23 +595,59 @@ export function CatalogScreen({
               </Pressable>
             </View>
 
-            <View style={styles.bestSellerCards}>
-              {spotlightProducts.map((prod) => (
-                <ProductPortraitCard
-                  key={`best-${prod.id}`}
-                  product={prod}
-                  widthPercent={width >= 1100 ? '31.8%' : width >= 620 ? '48%' : '100%'}
-                  badgeText="Bán chạy"
-                  badgeColor={colors.amber}
-                  badgeTextColor={colors.amberInk}
-                  busy={quickAddBusyId === prod.id}
-                  onOpenDetail={(color) =>
-                    navigate({ name: 'product', productId: prod.id, initialColor: color })
-                  }
-                  onQuickView={(color) => setQuickViewState({ product: prod, color })}
-                  onQuickAdd={(color) => void handleQuickAddToCart(prod, color)}
-                />
-              ))}
+            <View style={styles.bestSellerCarouselCol}>
+              <View style={styles.bestSellerNavRow}>
+                <Text style={styles.bestSellerNavHint}>
+                  Lướt qua các mẫu ({allActiveProducts.length} sản phẩm)
+                </Text>
+                <View style={styles.arrowGroup}>
+                  <Pressable
+                    onPress={() => scrollHorizontal(bestScrollRef, bestScrollX, -320)}
+                    style={styles.arrowBtn}
+                    accessibilityRole="button"
+                    accessibilityLabel="Mẫu bán chạy trước"
+                  >
+                    <Text style={styles.arrowText}>‹</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => scrollHorizontal(bestScrollRef, bestScrollX, 320)}
+                    style={styles.arrowBtn}
+                    accessibilityRole="button"
+                    accessibilityLabel="Mẫu bán chạy tiếp theo"
+                  >
+                    <Text style={styles.arrowText}>›</Text>
+                  </Pressable>
+                </View>
+              </View>
+
+              <ScrollView
+                ref={bestScrollRef}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                scrollEventThrottle={16}
+                onScroll={(e) => {
+                  bestScrollX.current = e.nativeEvent.contentOffset.x;
+                }}
+              >
+                <View style={styles.bestSellerScrollRow}>
+                  {allActiveProducts.map((prod) => (
+                    <ProductPortraitCard
+                      key={`best-${prod.id}`}
+                      product={prod}
+                      cardStyle={styles.carouselItemCard}
+                      badgeText="Bán chạy"
+                      badgeColor={colors.amber}
+                      badgeTextColor={colors.amberInk}
+                      busy={quickAddBusyId === prod.id}
+                      onOpenDetail={(color) =>
+                        navigate({ name: 'product', productId: prod.id, initialColor: color })
+                      }
+                      onQuickView={(color) => setQuickViewState({ product: prod, color })}
+                      onQuickAdd={(color) => void handleQuickAddToCart(prod, color)}
+                    />
+                  ))}
+                </View>
+              </ScrollView>
             </View>
           </View>
         ) : null}
@@ -696,7 +776,7 @@ export function CatalogScreen({
                   >
                     <ProductPortraitCard
                       product={product}
-                      widthPercent="100%"
+                      cardStyle={{ width: '100%' }}
                       badgeText={badgeText}
                       badgeColor={colors.coralRed}
                       badgeTextColor="#FFFFFF"
@@ -754,6 +834,24 @@ export function CatalogScreen({
         </Animated.View>
       ) : null}
 
+      {/* Floating Right-Edge Handle Tab when Sidebar is Collapsed — instant reopen from anywhere */}
+      {!sidebarOpen ? (
+        <Pressable
+          onPress={() => setSidebarOpen(true)}
+          style={[styles.edgeReopenHandle, shadows.lifted]}
+          accessibilityRole="button"
+          accessibilityLabel="Mở nhanh thanh bộ lọc"
+        >
+          <Text style={styles.edgeHandleArrow}>‹</Text>
+          <Text style={styles.edgeHandleText}>Bộ lọc</Text>
+          {activeFilterCount > 0 ? (
+            <View style={styles.edgeHandleBadge}>
+              <Text style={styles.edgeHandleBadgeText}>{activeFilterCount}</Text>
+            </View>
+          ) : null}
+        </Pressable>
+      ) : null}
+
       {/* Mobile/Tablet Right Slide-Over Drawer Modal */}
       {!isDesktop ? (
         <Modal
@@ -789,13 +887,13 @@ export function CatalogScreen({
 
 /**
  * Interactive multi-color product card featuring:
- * - Tall 3:4 portrait garment visual that updates dynamically when choosing color swatches
- * - Smooth floating Hover Action Toolbar on Web (Tùy chọn / Xem nhanh / Thêm giỏ)
+ * - Tall 3:4 portrait garment visual updating dynamically by chosen color swatch
+ * - Perfectly centered, large scaling Hover Action Toolbar inside the garment frame
  * - Clickable circular color swatches with active ring indicator
  */
 function ProductPortraitCard({
   product,
-  widthPercent,
+  cardStyle,
   badgeText,
   badgeColor,
   badgeTextColor,
@@ -805,7 +903,7 @@ function ProductPortraitCard({
   onQuickAdd,
 }: {
   product: Product;
-  widthPercent: `${number}%`;
+  cardStyle?: object;
   badgeText?: string;
   badgeColor: string;
   badgeTextColor: string;
@@ -829,7 +927,6 @@ function ProductPortraitCard({
     }).start();
   }, [hoverAnim, hovered]);
 
-  // Compute price for currently selected color swatch or fall back to lowest active price.
   const colorVariant = selectedColor
     ? product.variants.find((v) => v.color === selectedColor && v.status === 'ACTIVE')
     : undefined;
@@ -838,8 +935,7 @@ function ProductPortraitCard({
 
   return (
     <View
-      style={[styles.cardWrap, shadows.soft, { width: widthPercent }]}
-      // Web hover triggers floating action pills cleanly without nested Pressables
+      style={[styles.cardWrap, shadows.soft, cardStyle]}
       {...(Platform.OS === 'web'
         ? {
             onMouseEnter: () => setHovered(true),
@@ -847,70 +943,67 @@ function ProductPortraitCard({
           }
         : {})}
     >
-      <InteractiveCard
-        onPress={() => onOpenDetail(selectedColor)}
-        style={styles.card}
-        accessibilityLabel={product.name}
-      >
-        <View style={styles.cardArtWrap}>
-          <GarmentArtwork
-            uri={product.images[0]?.url}
-            altText={product.images[0]?.altText || product.name}
-            aspectRatio={3 / 4}
-            overrideToneHex={selectedColor ? resolveColorSwatch(selectedColor) : undefined}
-          />
-          {badgeText ? (
-            <View style={[styles.cardBadge, { backgroundColor: badgeColor }]}>
-              <Text style={[styles.cardBadgeText, { color: badgeTextColor }]}>{badgeText}</Text>
-            </View>
-          ) : null}
-
-          <View style={styles.freeshipPill}>
-            <Text style={styles.freeshipText}>FREESHIP</Text>
-          </View>
-        </View>
-      </InteractiveCard>
-
-      {/* Floating Hover Action Icons (positioned cleanly over the 3:4 artwork when hovered on Web) */}
-      <Animated.View
-        pointerEvents={hovered ? 'auto' : 'none'}
-        style={[
-          styles.hoverToolbar,
-          {
-            opacity: hoverAnim,
-            transform: [
-              {
-                translateY: hoverAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [8, 0],
-                }),
-              },
-            ],
-          },
-        ]}
-      >
-        <Pressable
+      <View style={styles.cardArtContainer}>
+        <InteractiveCard
           onPress={() => onOpenDetail(selectedColor)}
-          style={[styles.hoverCircleBtn, shadows.card]}
-          accessibilityLabel={`Tùy chọn ${product.name}`}
+          style={styles.card}
+          accessibilityLabel={product.name}
         >
-          <Text style={styles.hoverIconText}>⚙</Text>
-        </Pressable>
-        <Pressable
-          onPress={() => onQuickView(selectedColor)}
-          style={[styles.hoverCircleBtn, shadows.card]}
-          accessibilityLabel={`Xem nhanh ${product.name}`}
+          <View style={styles.cardArtWrap}>
+            <GarmentArtwork
+              uri={product.images[0]?.url}
+              altText={product.images[0]?.altText || product.name}
+              aspectRatio={3 / 4}
+              overrideToneHex={selectedColor ? resolveColorSwatch(selectedColor) : undefined}
+            />
+            {badgeText ? (
+              <View style={[styles.cardBadge, { backgroundColor: badgeColor }]}>
+                <Text style={[styles.cardBadgeText, { color: badgeTextColor }]}>{badgeText}</Text>
+              </View>
+            ) : null}
+
+            <View style={styles.freeshipPill}>
+              <Text style={styles.freeshipText}>FREESHIP</Text>
+            </View>
+          </View>
+        </InteractiveCard>
+
+        {/* Centered Large Hover Action Toolbar anchored directly inside garment frame */}
+        <Animated.View
+          pointerEvents={hovered ? 'auto' : 'none'}
+          style={[
+            styles.hoverToolbar,
+            {
+              opacity: hoverAnim,
+              transform: [
+                {
+                  scale: hoverAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.9, 1],
+                  }),
+                },
+              ],
+            },
+          ]}
         >
-          <Text style={styles.hoverIconText}>👁</Text>
-        </Pressable>
-        <Pressable
-          onPress={() => onQuickAdd(selectedColor)}
-          style={[styles.hoverCircleBtn, styles.hoverCircleAccent, shadows.card]}
-          accessibilityLabel={`Thêm nhanh ${product.name}`}
-        >
-          <Text style={[styles.hoverIconText, { color: '#FFFFFF' }]}>＋</Text>
-        </Pressable>
-      </Animated.View>
+          <HoverActionCircle
+            icon="⚙"
+            label={`Tùy chọn ${product.name}`}
+            onPress={() => onOpenDetail(selectedColor)}
+          />
+          <HoverActionCircle
+            icon="👁"
+            label={`Xem nhanh ${product.name}`}
+            onPress={() => onQuickView(selectedColor)}
+          />
+          <HoverActionCircle
+            icon="＋"
+            accent
+            label={`Thêm nhanh ${product.name}`}
+            onPress={() => onQuickAdd(selectedColor)}
+          />
+        </Animated.View>
+      </View>
 
       {/* Product meta, interactive circular multi-color swatches, price, and emerald pill CTA */}
       <View style={styles.cardBody}>
@@ -929,7 +1022,6 @@ function ProductPortraitCard({
           </Text>
         </View>
 
-        {/* Interactive circular color swatches */}
         <View style={styles.swatchCircleRow}>
           {uniqueColors.slice(0, 4).map((clr) => {
             const active = selectedColor === clr;
@@ -964,6 +1056,55 @@ function ProductPortraitCard({
         style={styles.cardCtaBtn}
       />
     </View>
+  );
+}
+
+/** Circular hover action button that scales up smoothly on pointer hover. */
+function HoverActionCircle({
+  icon,
+  label,
+  accent = false,
+  onPress,
+}: {
+  icon: string;
+  label: string;
+  accent?: boolean;
+  onPress: () => void;
+}): React.ReactElement {
+  const scale = useRef(new Animated.Value(1)).current;
+
+  /** Spring enlarge icon on hover. */
+  const handleHoverIn = () => {
+    Animated.spring(scale, {
+      toValue: 1.18,
+      friction: 6,
+      tension: 200,
+      useNativeDriver: USE_NATIVE_DRIVER,
+    }).start();
+  };
+
+  /** Restore resting scale on hover leave. */
+  const handleHoverOut = () => {
+    Animated.spring(scale, {
+      toValue: 1,
+      friction: 6,
+      tension: 200,
+      useNativeDriver: USE_NATIVE_DRIVER,
+    }).start();
+  };
+
+  return (
+    <Animated.View style={{ transform: [{ scale }] }}>
+      <Pressable
+        onPress={onPress}
+        onHoverIn={handleHoverIn}
+        onHoverOut={handleHoverOut}
+        style={[styles.hoverCircleBtn, accent && styles.hoverCircleAccent, shadows.lifted]}
+        accessibilityLabel={label}
+      >
+        <Text style={[styles.hoverIconText, accent && { color: '#FFFFFF' }]}>{icon}</Text>
+      </Pressable>
+    </Animated.View>
   );
 }
 
@@ -1018,6 +1159,7 @@ const styles = StyleSheet.create({
   pageRoot: {
     flex: 1,
     backgroundColor: colors.canvas,
+    position: 'relative',
   },
   pageRootDesktop: {
     flexDirection: 'row',
@@ -1161,6 +1303,32 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: spacing.sm,
+  },
+  carouselHeaderRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  arrowGroup: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+  },
+  arrowBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 99,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  arrowText: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.ink,
+    lineHeight: 20,
   },
   sectionHeading: {
     fontFamily: typography.serif,
@@ -1250,12 +1418,29 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: colors.ink,
   },
-  bestSellerCards: {
-    flex: 3,
+  bestSellerCarouselCol: {
+    flex: 3.2,
     minWidth: 280,
+    gap: spacing.sm,
+  },
+  bestSellerNavRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  bestSellerNavHint: {
+    fontFamily: typography.sans,
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.muted,
+  },
+  bestSellerScrollRow: {
+    flexDirection: 'row',
     gap: spacing.md,
+    paddingVertical: 2,
+  },
+  carouselItemCard: {
+    width: 256,
   },
   toolbarCard: {
     backgroundColor: colors.surface,
@@ -1343,6 +1528,46 @@ const styles = StyleSheet.create({
   dockedSidebarScroll: {
     padding: spacing.lg,
     paddingBottom: spacing.xxxl,
+  },
+  edgeReopenHandle: {
+    position: 'absolute',
+    right: 0,
+    top: '42%',
+    backgroundColor: colors.accent,
+    paddingVertical: 14,
+    paddingHorizontal: 10,
+    borderTopLeftRadius: radius.md,
+    borderBottomLeftRadius: radius.md,
+    alignItems: 'center',
+    gap: 4,
+    zIndex: 30,
+  },
+  edgeHandleArrow: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    lineHeight: 20,
+  },
+  edgeHandleText: {
+    fontFamily: typography.sans,
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  edgeHandleBadge: {
+    minWidth: 18,
+    height: 18,
+    borderRadius: 99,
+    backgroundColor: colors.amber,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  edgeHandleBadgeText: {
+    fontFamily: typography.sans,
+    fontSize: 10,
+    fontWeight: '800',
+    color: colors.amberInk,
   },
   sidebarBody: {
     gap: spacing.md,
@@ -1540,9 +1765,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     position: 'relative',
   },
+  cardArtContainer: {
+    position: 'relative',
+  },
   card: {
     borderRadius: radius.sm,
-    gap: spacing.xs,
     backgroundColor: colors.surface,
   },
   cardArtWrap: {
@@ -1578,21 +1805,22 @@ const styles = StyleSheet.create({
   },
   hoverToolbar: {
     position: 'absolute',
-    top: 132,
+    top: 0,
+    bottom: 0,
     left: 0,
     right: 0,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: spacing.sm,
+    gap: spacing.md,
     zIndex: 10,
   },
   hoverCircleBtn: {
-    width: 38,
-    height: 38,
+    width: 48,
+    height: 48,
     borderRadius: 99,
-    backgroundColor: 'rgba(255,255,255,0.95)',
-    borderWidth: 1,
+    backgroundColor: 'rgba(255,255,255,0.96)',
+    borderWidth: 1.5,
     borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1602,7 +1830,7 @@ const styles = StyleSheet.create({
     borderColor: colors.accent,
   },
   hoverIconText: {
-    fontSize: 16,
+    fontSize: 21,
     color: colors.ink,
     fontWeight: '700',
   },

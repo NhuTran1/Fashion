@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useApp } from '../state/AppContext';
 import { colors, radius, shadows, spacing, typography } from '../theme/tokens';
@@ -53,9 +53,12 @@ export const DEMO_VOUCHERS: DemoVoucher[] = [
   },
 ];
 
-/** Horizontal row of Sudes-inspired notched voucher ticket cards with copy-to-clipboard action. */
+/** Horizontal row of Sudes-inspired notched voucher ticket cards with left/right carousel arrows. */
 export function VoucherStrip(): React.ReactElement {
   const { showToast } = useApp();
+  const scrollRef = useRef<React.ComponentRef<typeof ScrollView>>(null);
+  const scrollXRef = useRef<number>(0);
+
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [activeInfoCode, setActiveInfoCode] = useState<string | null>(null);
 
@@ -72,14 +75,49 @@ export function VoucherStrip(): React.ReactElement {
     showToast('success', `Đã sao chép mã ưu đãi ${voucher.code}.`);
   };
 
+  /** Smoothly scroll the voucher ticket row horizontally by delta pixels. */
+  const scrollBy = (delta: number) => {
+    const nextX = Math.max(0, scrollXRef.current + delta);
+    scrollXRef.current = nextX;
+    scrollRef.current?.scrollTo({ x: nextX, animated: true });
+  };
+
   return (
     <View style={styles.section}>
       <View style={styles.headerRow}>
-        <Text style={styles.sectionTitle}>Ưu đãi & Voucher dành cho bạn</Text>
-        <Text style={styles.sectionSub}>Chạm &ldquo;Sao chép&rdquo; để dùng thử ở bước Checkout</Text>
+        <View style={styles.titleBlock}>
+          <Text style={styles.sectionTitle}>Ưu đãi & Voucher dành cho bạn</Text>
+          <Text style={styles.sectionSub}>Chạm &ldquo;Sao chép&rdquo; để dùng thử ở bước Checkout</Text>
+        </View>
+        <View style={styles.arrowGroup}>
+          <Pressable
+            onPress={() => scrollBy(-330)}
+            style={styles.arrowBtn}
+            accessibilityRole="button"
+            accessibilityLabel="Voucher trước"
+          >
+            <Text style={styles.arrowText}>‹</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => scrollBy(330)}
+            style={styles.arrowBtn}
+            accessibilityRole="button"
+            accessibilityLabel="Voucher tiếp theo"
+          >
+            <Text style={styles.arrowText}>›</Text>
+          </Pressable>
+        </View>
       </View>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+      <ScrollView
+        ref={scrollRef}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        scrollEventThrottle={16}
+        onScroll={(e) => {
+          scrollXRef.current = e.nativeEvent.contentOffset.x;
+        }}
+      >
         <View style={styles.row}>
           {DEMO_VOUCHERS.map((v) => {
             const isCopied = copiedCode === v.code;
@@ -87,20 +125,16 @@ export function VoucherStrip(): React.ReactElement {
 
             return (
               <View key={v.code} style={[styles.ticketCard, shadows.soft]}>
-                {/* Top & bottom circular ticket notches */}
                 <View style={styles.notchTop} />
                 <View style={styles.notchBottom} />
 
-                {/* Left colored stub */}
                 <View style={[styles.stub, { backgroundColor: v.stubColor }]}>
                   <Text style={styles.stubTop}>{v.stubTop}</Text>
                   <Text style={styles.stubValue}>{v.stubValue}</Text>
                 </View>
 
-                {/* Vertical dashed divider */}
                 <View style={styles.dashedDivider} />
 
-                {/* Right details & copy button */}
                 <View style={styles.body}>
                   <View style={styles.titleRow}>
                     <Text style={styles.title} numberOfLines={1}>
@@ -152,8 +186,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    alignItems: 'baseline',
+    alignItems: 'center',
     gap: spacing.sm,
+  },
+  titleBlock: {
+    gap: 2,
   },
   sectionTitle: {
     fontFamily: typography.serif,
@@ -165,6 +202,26 @@ const styles = StyleSheet.create({
     fontFamily: typography.sans,
     fontSize: 12,
     color: colors.muted,
+  },
+  arrowGroup: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+  },
+  arrowBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 99,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  arrowText: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.ink,
+    lineHeight: 20,
   },
   row: {
     flexDirection: 'row',
