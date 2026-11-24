@@ -118,7 +118,7 @@ export function StatusBadge({
 }): React.ReactElement {
   const palette: Record<typeof tone, { bg: string; fg: string; border: string }> = {
     neutral: { bg: colors.surfaceAlt, fg: colors.muted, border: colors.border },
-    accent: { bg: colors.accentSoft, fg: colors.accent, border: '#CFDAEC' },
+    accent: { bg: colors.accentSoft, fg: colors.accent, border: '#BEE4CE' },
     success: { bg: colors.successSoft, fg: colors.success, border: '#C2E4D3' },
     warning: { bg: colors.warningSoft, fg: colors.warning, border: '#EED6B2' },
     danger: { bg: colors.dangerSoft, fg: colors.danger, border: '#F0C5CD' },

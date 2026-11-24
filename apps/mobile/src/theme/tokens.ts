@@ -1,34 +1,41 @@
 import { Platform, ViewStyle } from 'react-native';
 
 /**
- * Refined modern fashion boutique design tokens for SỞI ATELIER.
- * Features soft multi-tier border radii, layered elevation shadows, luminous silk-pearl
- * canvas, and tailored Prussian indigo accents across both Android and Web.
+ * Fresh, vibrant e-commerce design tokens for SỞI Fashion inspired by the Bean Farm
+ * storefront structure: luminous white surfaces, crisp emerald-green primary actions,
+ * warm golden-amber category highlights, and soft mint promotional hero backdrops.
  */
 export const colors = {
-  canvas: '#F5F4F8',
+  canvas: '#F6F8F7',
   surface: '#FFFFFF',
-  surfaceSoft: '#FAF9FC',
-  surfaceAlt: '#EFEFF4',
+  surfaceSoft: '#F9FBFA',
+  surfaceAlt: '#EEF3F0',
   surfaceGlass: Platform.select({
-    web: 'rgba(255, 255, 255, 0.86)',
+    web: 'rgba(255, 255, 255, 0.94)',
     default: '#FFFFFF',
   }),
-  warmHighlight: '#EFE9E1',
-  ink: '#17161B',
-  muted: '#6C6A76',
-  accent: '#1E3A5F',
-  accentLight: '#35598A',
-  accentSoft: '#EBF0F8',
+  mintHero: '#DDF3E8',
+  mintHeroAccent: '#C5EAD7',
+  oliveBanner: '#63882B',
+  warmHighlight: '#FEF6DF',
+  amber: '#F5B82E',
+  amberInk: '#1F2937',
+  coralRed: '#E53935',
+  ink: '#1E242B',
+  muted: '#64706A',
+  accent: '#0E8A44',
+  accentLight: '#16A34A',
+  accentDark: '#096B34',
+  accentSoft: '#E6F5EC',
   accentInk: '#FFFFFF',
-  border: '#E8E6EE',
-  borderStrong: '#D0CDD9',
-  success: '#176E4B',
-  successSoft: '#E6F5EE',
-  warning: '#A45D12',
-  warningSoft: '#FDF2E3',
-  danger: '#B4233A',
-  dangerSoft: '#FCECEF',
+  border: '#E3EAE6',
+  borderStrong: '#C9D6CF',
+  success: '#0E8A44',
+  successSoft: '#E6F5EC',
+  warning: '#B4690E',
+  warningSoft: '#FEF4DC',
+  danger: '#DC2626',
+  dangerSoft: '#FEECEC',
 } as const;
 
 export const spacing = {
@@ -43,19 +50,19 @@ export const spacing = {
 
 export const radius = {
   xs: 8,
-  sm: 14,
-  md: 18,
-  lg: 24,
+  sm: 12,
+  md: 16,
+  lg: 22,
   pill: 999,
 } as const;
 
 export const shadows: Record<'soft' | 'card' | 'lifted', ViewStyle> = {
   soft: Platform.select({
     web: {
-      boxShadow: '0 2px 10px rgba(23, 22, 27, 0.04)',
+      boxShadow: '0 2px 10px rgba(14, 42, 26, 0.05)',
     } as ViewStyle,
     default: {
-      shadowColor: '#17161B',
+      shadowColor: '#0E2A1A',
       shadowOffset: { width: 0, height: 2 },
       shadowOpacity: 0.05,
       shadowRadius: 8,
@@ -64,25 +71,25 @@ export const shadows: Record<'soft' | 'card' | 'lifted', ViewStyle> = {
   }),
   card: Platform.select({
     web: {
-      boxShadow: '0 8px 24px rgba(23, 22, 27, 0.06), 0 1px 3px rgba(23, 22, 27, 0.03)',
+      boxShadow: '0 6px 20px rgba(14, 42, 26, 0.06), 0 1px 3px rgba(14, 42, 26, 0.03)',
     } as ViewStyle,
     default: {
-      shadowColor: '#17161B',
+      shadowColor: '#0E2A1A',
       shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.08,
+      shadowOpacity: 0.07,
       shadowRadius: 12,
       elevation: 3,
     },
   }),
   lifted: Platform.select({
     web: {
-      boxShadow: '0 16px 36px rgba(30, 58, 95, 0.12), 0 4px 10px rgba(23, 22, 27, 0.05)',
+      boxShadow: '0 14px 32px rgba(14, 138, 68, 0.14), 0 4px 10px rgba(14, 42, 26, 0.06)',
     } as ViewStyle,
     default: {
-      shadowColor: '#1E3A5F',
+      shadowColor: '#0E8A44',
       shadowOffset: { width: 0, height: 8 },
-      shadowOpacity: 0.14,
-      shadowRadius: 18,
+      shadowOpacity: 0.16,
+      shadowRadius: 16,
       elevation: 6,
     },
   }),
@@ -90,10 +97,10 @@ export const shadows: Record<'soft' | 'card' | 'lifted', ViewStyle> = {
 
 export const typography = {
   serif: Platform.select({
-    web: "'Georgia', 'Times New Roman', serif",
-    ios: 'Georgia',
-    android: 'serif',
-    default: 'serif',
+    web: "'Segoe UI', 'Helvetica Neue', Arial, sans-serif",
+    ios: 'System',
+    android: 'sans-serif-medium',
+    default: 'sans-serif',
   }),
   sans: Platform.select({
     web: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",

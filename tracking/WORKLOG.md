@@ -324,3 +324,11 @@
   - `npm run typecheck --workspace apps/mobile` & `npm run typecheck --workspace apps/api`: PASS (0 errors).
   - `EXPO_NO_TELEMETRY=1 HOME=/tmp npx expo export --platform web --output-dir /tmp/fashion-web-dist`: PASS (294 modules, 744KB).
   - Playwright Chromium E2E Smoke Test (`1440x900`, `http://127.0.0.1:4177`): PASS (`PLAYWRIGHT E2E WEB SMOKE TEST PASSED (0 errors)`).
+
+
+## 2026-11-24 — Bean Farm Storefront Redesign for Fashion (Nhánh feat/frontend-expo-mock)
+- Scope: Thiết kế lại toàn bộ giao diện theo phong cách Bean Farm (`#0E8A44` emerald, `#F5B82E` amber, `#DDF3E8` mint hero, `#E53935` quick-order/badge): Header 2 tầng (logo + thanh tìm kiếm + Giỏ hàng có badge, thanh dưới gồm nút `☰ Danh mục sản phẩm`, nav pill và `Mua hàng nhanh`), Hero Mint Banner, dải `Danh mục nổi bật`, khối `Bán chạy nhất hàng ngày`, lưới thẻ áo quần khối chữ nhật `3:4` kèm nút `Thêm vào giỏ`, và sidebar bên phải đóng/mở với 2 thẻ tiêu đề xanh `DANH MỤC SẢN PHẨM` & `BỘ LỌC SẢN PHẨM`.
+- Actual commands and results:
+  - `npm run typecheck --workspace apps/mobile` & `npm run typecheck --workspace apps/api`: PASS (0 errors).
+  - `EXPO_NO_TELEMETRY=1 HOME=/tmp npx expo export --platform web --output-dir /tmp/fashion-web-dist`: PASS (294 modules, 756KB).
+  - Playwright Chromium E2E Smoke Test (`1440x900`, `http://127.0.0.1:4179`): PASS (`PLAYWRIGHT E2E WEB SMOKE TEST PASSED (0 errors)`).

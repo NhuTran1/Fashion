@@ -184,7 +184,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceSoft,
   },
   navItemActive: {
-    borderColor: '#C9D8EC',
+    borderColor: '#BEE4CE',
     backgroundColor: colors.accentSoft,
   },
   navText: { fontFamily: typography.sans, fontSize: 13, color: colors.ink },

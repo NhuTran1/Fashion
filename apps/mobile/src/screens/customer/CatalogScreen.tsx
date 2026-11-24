@@ -28,7 +28,7 @@ import {
   spacing,
   typography,
 } from '../../theme/tokens';
-import { Category, EntityId, Product, ProductSort } from '../../types/api';
+import { ApiClientError, Category, EntityId, Product, ProductSort } from '../../types/api';
 import { formatVnd, getLowestActivePrice, getTotalActiveStock } from '../../utils/format';
 
 const SIZES = ['S', 'M', 'L', 'XL'];
@@ -40,22 +40,29 @@ const SORT_OPTIONS: Array<{ value: ProductSort; label: string }> = [
 ];
 
 /**
- * Full-screen Customer storefront featuring:
- * - Edge-to-edge fluid product grid with tall 3:4 portrait garment rectangles
- * - Full-height docked collapsible right-hand Search & Filter sidebar on desktop (zero scroll gap)
- * - Right slide-over drawer on mobile/tablet
+ * Full-screen Fashion Storefront modeled after Bean Farm's bright, high-conversion layout:
+ * - Soft Mint Hero Banner (#DDF3E8)
+ * - "Danh mục nổi bật" category strip
+ * - "Bán chạy nhất hàng ngày" olive-emerald spotlight block
+ * - "TẤT CẢ SẢN PHẨM" grid with tall 3:4 portrait garment cards & emerald "Thêm vào giỏ" pills
+ * - Collapsible right-hand docked sidebar with green headers ("DANH MỤC SẢN PHẨM" & "BỘ LỌC SẢN PHẨM")
  */
-export function CatalogScreen(): React.ReactElement {
-  const { navigate, handleApiError } = useApp();
+export function CatalogScreen({
+  externalSearch,
+}: {
+  externalSearch?: { q: string; nonce: number } | null;
+}): React.ReactElement {
+  const { user, navigate, refreshCart, handleApiError, showToast } = useApp();
   const { width } = useWindowDimensions();
 
   const isDesktop = width >= 920;
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [allActiveProducts, setAllActiveProducts] = useState<Product[]>([]);
   const [total, setTotal] = useState<number>(0);
   const [page, setPage] = useState<number>(1);
-  const pageSize = 6;
+  const pageSize = 8;
 
   const [searchInput, setSearchInput] = useState<string>('');
   const [appliedQ, setAppliedQ] = useState<string>('');
@@ -65,10 +72,19 @@ export function CatalogScreen(): React.ReactElement {
   const [sort, setSort] = useState<ProductSort>('NEWEST');
 
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(width >= 920);
+  const [quickAddBusyId, setQuickAddBusyId] = useState<EntityId | null>(null);
 
   const [loading, setLoading] = useState<boolean>(true);
   const [loadingMore, setLoadingMore] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Sync top header search bar queries into Catalog search state.
+  useEffect(() => {
+    if (externalSearch) {
+      setSearchInput(externalSearch.q);
+      setAppliedQ(externalSearch.q);
+    }
+  }, [externalSearch]);
 
   const sidebarAnim = useRef(new Animated.Value(sidebarOpen ? 1 : 0)).current;
   useEffect(() => {
@@ -80,13 +96,17 @@ export function CatalogScreen(): React.ReactElement {
     }).start();
   }, [sidebarAnim, sidebarOpen]);
 
-  /** Load ACTIVE categories for filter chips. */
-  const fetchCategories = useCallback(async () => {
+  /** Load ACTIVE categories and baseline active catalog for category counts & spotlight cards. */
+  const fetchCategoriesAndSpotlight = useCallback(async () => {
     try {
-      const list = await fashionApi.listCategories();
-      setCategories(list);
+      const [catList, fullPage] = await Promise.all([
+        fashionApi.listCategories(),
+        fashionApi.listProducts({ page: 1, pageSize: 50, sort: 'NEWEST' }),
+      ]);
+      setCategories(catList);
+      setAllActiveProducts(fullPage.items);
     } catch {
-      // Categories failure should not block product listing retry flow.
+      // Non-blocking: main grid handles retry.
     }
   }, []);
 
@@ -123,8 +143,8 @@ export function CatalogScreen(): React.ReactElement {
   );
 
   useEffect(() => {
-    void fetchCategories();
-  }, [fetchCategories]);
+    void fetchCategoriesAndSpotlight();
+  }, [fetchCategoriesAndSpotlight]);
 
   useEffect(() => {
     void fetchProducts(1, false);
@@ -140,6 +160,43 @@ export function CatalogScreen(): React.ReactElement {
     setSort('NEWEST');
   };
 
+  /** Add first in-stock variant quickly from product card or redirect Guest/out-of-stock to detail/login. */
+  const handleQuickAddToCart = async (product: Product) => {
+    const firstAvailable = product.variants.find(
+      (v) => v.status === 'ACTIVE' && v.stockQuantity > 0,
+    );
+    if (!firstAvailable) {
+      navigate({ name: 'product', productId: product.id });
+      return;
+    }
+    if (!user) {
+      showToast('info', 'Vui lòng đăng nhập Customer để thêm sản phẩm vào giỏ hàng.');
+      navigate({ name: 'auth', mode: 'login' });
+      return;
+    }
+    if (user.role !== 'CUSTOMER') {
+      showToast('error', 'Tài khoản Quản trị/Nhân viên không dùng giỏ hàng.');
+      return;
+    }
+
+    setQuickAddBusyId(product.id);
+    try {
+      await fashionApi.addCartItem({ variantId: firstAvailable.id, quantity: 1 });
+      await refreshCart();
+      showToast(
+        'success',
+        `Đã thêm ${product.name} (${firstAvailable.size}/${firstAvailable.color}) vào giỏ.`,
+      );
+    } catch (err) {
+      showToast('error', handleApiError(err));
+      if (err instanceof ApiClientError && err.code === 'OUT_OF_STOCK') {
+        await fetchProducts(1, false);
+      }
+    } finally {
+      setQuickAddBusyId(null);
+    }
+  };
+
   const activeFilterCount =
     (appliedQ ? 1 : 0) +
     (selectedCategoryId ? 1 : 0) +
@@ -147,7 +204,6 @@ export function CatalogScreen(): React.ReactElement {
     (selectedColor ? 1 : 0) +
     (sort !== 'NEWEST' ? 1 : 0);
 
-  // Adaptive full-screen column layout depending on viewport width and sidebar state.
   const columns = isDesktop
     ? sidebarOpen
       ? width >= 1380
@@ -166,13 +222,14 @@ export function CatalogScreen(): React.ReactElement {
     columns === 4 ? '23.8%' : columns === 3 ? '32.2%' : columns === 2 ? '48.8%' : '100%';
 
   const selectedCategoryName = categories.find((c) => c.id === selectedCategoryId)?.name;
+  const spotlightProducts = allActiveProducts.slice(0, 3);
 
-  /** Reusable search & filter sidebar content shared by Desktop full-height rail and Mobile drawer. */
+  /** Bean Farm styled right-hand sidebar with emerald headers ("DANH MỤC SẢN PHẨM" & "BỘ LỌC SẢN PHẨM"). */
   const renderFilterSidebarContent = () => (
     <View style={styles.sidebarBody}>
-      <View style={styles.sidebarHeader}>
+      <View style={styles.sidebarTopBar}>
         <View style={styles.sidebarTitleRow}>
-          <Text style={styles.sidebarTitle}>Tìm kiếm & Bộ lọc</Text>
+          <Text style={styles.sidebarMainHeading}>Bộ lọc & Tìm kiếm</Text>
           {activeFilterCount > 0 ? (
             <View style={styles.countBadge}>
               <Text style={styles.countBadgeText}>{activeFilterCount}</Text>
@@ -189,151 +246,163 @@ export function CatalogScreen(): React.ReactElement {
         </Pressable>
       </View>
 
-      {/* Search input with clear & submit */}
-      <View style={styles.sidebarSection}>
-        <Text style={styles.subLabel}>Từ khóa sản phẩm / SKU</Text>
-        <View style={styles.searchInputWrap}>
-          <TextInput
-            value={searchInput}
-            onChangeText={setSearchInput}
-            onSubmitEditing={() => setAppliedQ(searchInput.trim())}
-            placeholder="Áo linen, denim, SKU..."
-            placeholderTextColor={colors.muted}
-            style={styles.searchInput}
-            returnKeyType="search"
+      {/* Card 1: DANH MỤC SẢN PHẨM (Bean Farm emerald header box) */}
+      <View style={styles.sidebarBox}>
+        <View style={styles.sidebarBoxHeader}>
+          <Text style={styles.sidebarBoxHeaderText}>DANH MỤC SẢN PHẨM</Text>
+        </View>
+        <View style={styles.sidebarBoxContent}>
+          <Pressable
+            onPress={() => setSelectedCategoryId(undefined)}
+            style={[styles.catTreeRow, !selectedCategoryId && styles.catTreeRowActive]}
+          >
+            <Text style={[styles.catTreeText, !selectedCategoryId && styles.catTreeTextActive]}>
+              Tất cả thiết kế
+            </Text>
+            <Text style={styles.catTreePlus}>+</Text>
+          </Pressable>
+          {categories.map((cat) => {
+            const active = selectedCategoryId === cat.id;
+            return (
+              <Pressable
+                key={cat.id}
+                onPress={() => setSelectedCategoryId(active ? undefined : cat.id)}
+                style={[styles.catTreeRow, active && styles.catTreeRowActive]}
+              >
+                <Text style={[styles.catTreeText, active && styles.catTreeTextActive]}>
+                  {cat.name}
+                </Text>
+                <Text style={[styles.catTreePlus, active && { color: colors.accent }]}>
+                  {active ? '−' : '+'}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
+
+      {/* Card 2: BỘ LỌC SẢN PHẨM (Search + Size + Color + Sort) */}
+      <View style={styles.sidebarBox}>
+        <View style={styles.sidebarBoxHeader}>
+          <Text style={styles.sidebarBoxHeaderText}>BỘ LỌC SẢN PHẨM</Text>
+        </View>
+        <View style={styles.sidebarBoxContent}>
+          <Text style={styles.subLabel}>TÌM THEO TÊN HOẶC SKU</Text>
+          <View style={styles.searchInputWrap}>
+            <TextInput
+              value={searchInput}
+              onChangeText={setSearchInput}
+              onSubmitEditing={() => setAppliedQ(searchInput.trim())}
+              placeholder="Áo linen, denim, SKU..."
+              placeholderTextColor={colors.muted}
+              style={styles.searchInput}
+              returnKeyType="search"
+            />
+            {searchInput.length > 0 ? (
+              <Pressable
+                onPress={() => {
+                  setSearchInput('');
+                  setAppliedQ('');
+                }}
+                style={styles.clearInputBtn}
+              >
+                <Text style={styles.clearInputText}>✕</Text>
+              </Pressable>
+            ) : null}
+          </View>
+          <EditorialButton
+            label="Tìm sản phẩm"
+            compact
+            onPress={() => setAppliedQ(searchInput.trim())}
           />
-          {searchInput.length > 0 ? (
-            <Pressable
-              onPress={() => {
-                setSearchInput('');
-                setAppliedQ('');
-              }}
-              style={styles.clearInputBtn}
-            >
-              <Text style={styles.clearInputText}>✕</Text>
-            </Pressable>
+
+          <View style={styles.sidebarDivider} />
+          <Text style={styles.subLabel}>CHỌN KÍCH CỠ</Text>
+          <View style={styles.chipRow}>
+            {SIZES.map((sz) => (
+              <FilterChip
+                key={sz}
+                label={sz}
+                active={selectedSize === sz}
+                onPress={() => setSelectedSize(selectedSize === sz ? undefined : sz)}
+              />
+            ))}
+          </View>
+
+          <View style={styles.sidebarDivider} />
+          <Text style={styles.subLabel}>CHỌN MÀU SẮC</Text>
+          <View style={styles.chipRow}>
+            {COLORS.map((clr) => (
+              <FilterChip
+                key={clr}
+                label={clr}
+                swatch={resolveColorSwatch(clr)}
+                active={selectedColor === clr}
+                onPress={() => setSelectedColor(selectedColor === clr ? undefined : clr)}
+              />
+            ))}
+          </View>
+
+          <View style={styles.sidebarDivider} />
+          <Text style={styles.subLabel}>SẮP XẾP</Text>
+          <View style={styles.chipRow}>
+            {SORT_OPTIONS.map((opt) => (
+              <FilterChip
+                key={opt.value}
+                label={opt.label}
+                active={sort === opt.value}
+                onPress={() => setSort(opt.value)}
+              />
+            ))}
+          </View>
+
+          {activeFilterCount > 0 ? (
+            <EditorialButton
+              label="Xóa tất cả bộ lọc"
+              variant="secondary"
+              compact
+              onPress={clearFilters}
+              style={{ marginTop: spacing.xs }}
+            />
           ) : null}
         </View>
-        <EditorialButton
-          label="Áp dụng tìm kiếm"
-          compact
-          onPress={() => setAppliedQ(searchInput.trim())}
-        />
       </View>
-
-      {/* Category pills */}
-      <View style={styles.sidebarSection}>
-        <Text style={styles.subLabel}>Danh mục</Text>
-        <View style={styles.chipRow}>
-          <FilterChip
-            label="Tất cả"
-            active={!selectedCategoryId}
-            onPress={() => setSelectedCategoryId(undefined)}
-          />
-          {categories.map((cat) => (
-            <FilterChip
-              key={cat.id}
-              label={cat.name}
-              active={selectedCategoryId === cat.id}
-              onPress={() =>
-                setSelectedCategoryId(selectedCategoryId === cat.id ? undefined : cat.id)
-              }
-            />
-          ))}
-        </View>
-      </View>
-
-      {/* Size pills */}
-      <View style={styles.sidebarSection}>
-        <Text style={styles.subLabel}>Kích cỡ</Text>
-        <View style={styles.chipRow}>
-          {SIZES.map((sz) => (
-            <FilterChip
-              key={sz}
-              label={sz}
-              active={selectedSize === sz}
-              onPress={() => setSelectedSize(selectedSize === sz ? undefined : sz)}
-            />
-          ))}
-        </View>
-      </View>
-
-      {/* Color swatches */}
-      <View style={styles.sidebarSection}>
-        <Text style={styles.subLabel}>Màu sắc</Text>
-        <View style={styles.chipRow}>
-          {COLORS.map((clr) => (
-            <FilterChip
-              key={clr}
-              label={clr}
-              swatch={resolveColorSwatch(clr)}
-              active={selectedColor === clr}
-              onPress={() => setSelectedColor(selectedColor === clr ? undefined : clr)}
-            />
-          ))}
-        </View>
-      </View>
-
-      {/* Sort options */}
-      <View style={styles.sidebarSectionLast}>
-        <Text style={styles.subLabel}>Sắp xếp</Text>
-        <View style={styles.chipRow}>
-          {SORT_OPTIONS.map((opt) => (
-            <FilterChip
-              key={opt.value}
-              label={opt.label}
-              active={sort === opt.value}
-              onPress={() => setSort(opt.value)}
-            />
-          ))}
-        </View>
-      </View>
-
-      {activeFilterCount > 0 ? (
-        <EditorialButton
-          label="Xóa tất cả bộ lọc"
-          variant="secondary"
-          compact
-          onPress={clearFilters}
-        />
-      ) : null}
     </View>
   );
 
   return (
     <View style={[styles.pageRoot, isDesktop && styles.pageRootDesktop]}>
-      {/* Left/Main Full-Screen Scrollable Catalog */}
+      {/* Left/Main Full-Screen Scrollable Storefront */}
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-        {/* Full-width editorial lookbook hero */}
-        <FadeSlideIn distance={14} duration={380}>
-          <View style={[styles.hero, shadows.card]}>
-            <View style={styles.heroGlowRight} />
-            <View style={styles.heroGlowBottom} />
-
-            <View style={styles.heroCopy}>
-              <Text style={styles.heroTitle}>Sợi tự nhiên & Phom dáng kiến trúc</Text>
-              <Text style={styles.heroSubtitle}>
-                Thiết kế may mặc thường nhật từ linen, cotton 260gsm và len merino. Thanh toán COD
-                mô phỏng minh bạch, kiểm soát tồn kho theo từng SKU.
+        {/* 1. Mint Promotional Hero Banner (Bean Farm Screenshot 3 style) */}
+        <FadeSlideIn distance={14} duration={360}>
+          <View style={[styles.mintHero, shadows.card]}>
+            <View style={styles.mintCircleBg} />
+            <View style={styles.mintHeroCopy}>
+              <Text style={styles.mintHeroTitle}>
+                Thời Trang Tự Nhiên{'\n'}Chuẩn Phom Hàng Ngày
+              </Text>
+              <Text style={styles.mintHeroSubtitle}>
+                Miễn phí giao hàng toàn quốc đơn COD mô phỏng. Chất liệu linen, cotton 260gsm và
+                len merino chọn lọc.
               </Text>
               <View style={styles.heroActions}>
-                <EditorialButton label="Xem tất cả thiết kế" onPress={clearFilters} compact />
+                <EditorialButton label="ĐẶT NGAY" onPress={clearFilters} />
                 <EditorialButton
-                  label="Theo dõi đơn hàng"
+                  label="Đơn hàng của tôi"
                   variant="secondary"
                   onPress={() => navigate({ name: 'orders' })}
-                  compact
                 />
               </View>
             </View>
 
             {width >= 720 ? (
-              <FloatingAmbient style={styles.heroVisual}>
+              <FloatingAmbient style={styles.mintHeroVisual}>
                 <View style={shadows.lifted}>
                   <GarmentArtwork
-                    uri="garment://%231E3A5F/coat/Atelier%20Lookbook"
-                    altText="Bộ sưu tập Sợi Atelier"
-                    height={210}
+                    uri="garment://%231E3A5F/coat/S%E1%BB%9EI%20Lookbook"
+                    altText="Bộ sưu tập Sợi Fashion"
+                    height={215}
                   />
                 </View>
               </FloatingAmbient>
@@ -341,31 +410,106 @@ export function CatalogScreen(): React.ReactElement {
           </View>
         </FadeSlideIn>
 
-        {/* Toolbar with product count, active filter summary pills, and right-aligned Toggle Button */}
+        {/* 2. "Danh mục nổi bật" Horizontal Strip (Bean Farm Screenshot 3) */}
+        {categories.length > 0 ? (
+          <View style={styles.sectionBlock}>
+            <View style={styles.sectionHeaderRow}>
+              <Text style={styles.sectionHeading}>Danh mục nổi bật</Text>
+              <Pressable onPress={() => setSelectedCategoryId(undefined)}>
+                <Text style={styles.sectionLink}>Xem tất cả</Text>
+              </Pressable>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View style={styles.catStripRow}>
+                {categories.map((cat) => {
+                  const catProducts = allActiveProducts.filter((p) => p.categoryId === cat.id);
+                  const repImage = catProducts[0]?.images[0]?.url;
+                  const active = selectedCategoryId === cat.id;
+                  return (
+                    <Pressable
+                      key={cat.id}
+                      onPress={() => setSelectedCategoryId(active ? undefined : cat.id)}
+                      style={[
+                        styles.catSpotlightCard,
+                        shadows.soft,
+                        active && styles.catSpotlightActive,
+                      ]}
+                    >
+                      <GarmentArtwork
+                        uri={repImage}
+                        altText={cat.name}
+                        height={110}
+                        hideCaption
+                      />
+                      <Text style={styles.catSpotlightTitle} numberOfLines={1}>
+                        {cat.name}
+                      </Text>
+                      <Text style={styles.catSpotlightCount}>{catProducts.length} sản phẩm</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </ScrollView>
+          </View>
+        ) : null}
+
+        {/* 3. "Bán chạy nhất hàng ngày" Olive-Emerald Promo Block (Bean Farm Screenshot 4) */}
+        {spotlightProducts.length > 0 && activeFilterCount === 0 ? (
+          <View style={[styles.bestSellerPanel, shadows.card]}>
+            <View style={styles.bestSellerPromo}>
+              <Text style={styles.promoHeadline}>Bán chạy nhất hàng ngày</Text>
+              <Text style={styles.promoSub}>
+                Ưu đãi độc quyền - Giá tốt từ 290.000₫. Đặt COD mô phỏng ngay hôm nay.
+              </Text>
+              <Pressable
+                onPress={() => navigate({ name: 'product', productId: spotlightProducts[0].id })}
+                style={styles.promoWhiteBtn}
+              >
+                <Text style={styles.promoWhiteBtnText}>Mua ngay</Text>
+              </Pressable>
+            </View>
+
+            <View style={styles.bestSellerCards}>
+              {spotlightProducts.map((prod) => (
+                <ProductPortraitCard
+                  key={`best-${prod.id}`}
+                  product={prod}
+                  widthPercent={width >= 1100 ? '31.8%' : width >= 620 ? '48%' : '100%'}
+                  badgeText="Bán chạy"
+                  badgeColor={colors.amber}
+                  badgeTextColor={colors.amberInk}
+                  busy={quickAddBusyId === prod.id}
+                  onOpenDetail={() => navigate({ name: 'product', productId: prod.id })}
+                  onQuickAdd={() => void handleQuickAddToCart(prod)}
+                />
+              ))}
+            </View>
+          </View>
+        ) : null}
+
+        {/* 4. "TẤT CẢ SẢN PHẨM" Toolbar & Active Filters */}
         <View style={[styles.toolbarCard, shadows.soft]}>
           <View style={styles.toolbarTop}>
             <View style={styles.toolbarMeta}>
+              <Text style={styles.allProductsTitle}>TẤT CẢ SẢN PHẨM</Text>
               <Text style={styles.resultCount}>
-                {loading ? 'Đang tải danh mục sản phẩm...' : `${total} sản phẩm đang mở bán`}
+                {loading ? 'Đang tải...' : `${total} sản phẩm đang mở bán`}
               </Text>
             </View>
 
-            <Pressable
-              onPress={() => setSidebarOpen((open) => !open)}
-              style={[styles.toggleSidebarBtn, sidebarOpen && styles.toggleSidebarBtnActive]}
-              accessibilityRole="button"
-              accessibilityLabel={sidebarOpen ? 'Ẩn thanh tìm kiếm' : 'Mở thanh tìm kiếm'}
-            >
-              <Text
-                style={[
-                  styles.toggleSidebarText,
-                  sidebarOpen && styles.toggleSidebarTextActive,
-                ]}
+            <View style={styles.toolbarRightActions}>
+              <Pressable
+                onPress={() => setSidebarOpen((open) => !open)}
+                style={[styles.toggleSidebarBtn, sidebarOpen && styles.toggleSidebarBtnActive]}
+                accessibilityRole="button"
+                accessibilityLabel={sidebarOpen ? 'Ẩn thanh tìm kiếm' : 'Mở thanh tìm kiếm'}
               >
-                {sidebarOpen ? 'Ẩn bộ lọc' : 'Tìm kiếm & Lọc'}
-                {!sidebarOpen && activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
-              </Text>
-            </Pressable>
+                <Text style={styles.toggleSidebarText}>
+                  {sidebarOpen ? 'Ẩn bộ lọc' : 'Tìm kiếm & Lọc'}
+                  {!sidebarOpen && activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
+                </Text>
+              </Pressable>
+            </View>
           </View>
 
           {activeFilterCount > 0 ? (
@@ -407,7 +551,7 @@ export function CatalogScreen(): React.ReactElement {
           ) : null}
         </View>
 
-        {/* Tall 3:4 Portrait Rectangular Product Grid */}
+        {/* 5. Main Tall 3:4 Rectangular Portrait Product Grid */}
         {loading && products.length === 0 ? (
           <View style={styles.grid}>
             {[0, 1, 2].map((idx) => (
@@ -451,64 +595,30 @@ export function CatalogScreen(): React.ReactElement {
 
             <View style={styles.grid}>
               {products.map((product, idx) => {
-                const lowestPrice = getLowestActivePrice(product);
                 const totalStock = getTotalActiveStock(product);
-                const uniqueColors = Array.from(new Set(product.variants.map((v) => v.color)));
-
+                const badgeText =
+                  totalStock === 0
+                    ? 'Hết hàng'
+                    : totalStock <= 3
+                      ? `Còn ${totalStock}`
+                      : undefined;
                 return (
                   <FadeSlideIn
                     key={product.id}
-                    delay={Math.min(idx * 45, 220)}
+                    delay={Math.min(idx * 40, 200)}
                     distance={14}
                     style={{ width: cardWidthPercent }}
                   >
-                    <InteractiveCard
-                      onPress={() => navigate({ name: 'product', productId: product.id })}
-                      style={styles.card}
-                      accessibilityLabel={product.name}
-                    >
-                      <GarmentArtwork
-                        uri={product.images[0]?.url}
-                        altText={product.images[0]?.altText || product.name}
-                        aspectRatio={3 / 4}
-                      />
-                      <View style={styles.cardBody}>
-                        <Text style={styles.cardTitle} numberOfLines={1}>
-                          {product.name}
-                        </Text>
-                        <View style={styles.cardMetaRow}>
-                          <Text style={styles.cardPrice}>{formatVnd(lowestPrice)}</Text>
-                          <View
-                            style={[
-                              styles.stockPill,
-                              totalStock === 0 && { backgroundColor: colors.dangerSoft },
-                            ]}
-                          >
-                            <Text
-                              style={[
-                                styles.cardStock,
-                                totalStock === 0 && { color: colors.danger },
-                              ]}
-                            >
-                              {totalStock > 0 ? `Còn ${totalStock}` : 'Tạm hết hàng'}
-                            </Text>
-                          </View>
-                        </View>
-                        <View style={styles.swatchRow}>
-                          {uniqueColors.map((clr) => (
-                            <View key={clr} style={styles.swatchItem}>
-                              <View
-                                style={[
-                                  styles.swatchDot,
-                                  { backgroundColor: resolveColorSwatch(clr) },
-                                ]}
-                              />
-                              <Text style={styles.swatchText}>{clr}</Text>
-                            </View>
-                          ))}
-                        </View>
-                      </View>
-                    </InteractiveCard>
+                    <ProductPortraitCard
+                      product={product}
+                      widthPercent="100%"
+                      badgeText={badgeText}
+                      badgeColor={colors.coralRed}
+                      badgeTextColor="#FFFFFF"
+                      busy={quickAddBusyId === product.id}
+                      onOpenDetail={() => navigate({ name: 'product', productId: product.id })}
+                      onQuickAdd={() => void handleQuickAddToCart(product)}
+                    />
                   </FadeSlideIn>
                 );
               })}
@@ -538,7 +648,7 @@ export function CatalogScreen(): React.ReactElement {
             {
               width: sidebarAnim.interpolate({
                 inputRange: [0, 1],
-                outputRange: [0, 320],
+                outputRange: [0, 324],
               }),
               opacity: sidebarAnim,
               borderLeftWidth: sidebarOpen ? 1 : 0,
@@ -574,6 +684,78 @@ export function CatalogScreen(): React.ReactElement {
           </View>
         </Modal>
       ) : null}
+    </View>
+  );
+}
+
+/** Bean Farm inspired product card with tall 3:4 portrait garment visual and emerald pill CTA. */
+function ProductPortraitCard({
+  product,
+  widthPercent,
+  badgeText,
+  badgeColor,
+  badgeTextColor,
+  busy,
+  onOpenDetail,
+  onQuickAdd,
+}: {
+  product: Product;
+  widthPercent: `${number}%`;
+  badgeText?: string;
+  badgeColor: string;
+  badgeTextColor: string;
+  busy: boolean;
+  onOpenDetail: () => void;
+  onQuickAdd: () => void;
+}): React.ReactElement {
+  const lowestPrice = getLowestActivePrice(product);
+  const totalStock = getTotalActiveStock(product);
+  const uniqueColors = Array.from(new Set(product.variants.map((v) => v.color)));
+
+  return (
+    <View style={[styles.cardWrap, { width: widthPercent }]}>
+      <InteractiveCard
+        onPress={onOpenDetail}
+        style={styles.card}
+        accessibilityLabel={product.name}
+      >
+        <View style={styles.cardArtWrap}>
+          <GarmentArtwork
+            uri={product.images[0]?.url}
+            altText={product.images[0]?.altText || product.name}
+            aspectRatio={3 / 4}
+          />
+          {badgeText ? (
+            <View style={[styles.cardBadge, { backgroundColor: badgeColor }]}>
+              <Text style={[styles.cardBadgeText, { color: badgeTextColor }]}>{badgeText}</Text>
+            </View>
+          ) : null}
+        </View>
+
+        <View style={styles.cardBody}>
+          <Text style={styles.cardTitle} numberOfLines={1}>
+            {product.name}
+          </Text>
+          <Text style={styles.cardPrice}>{formatVnd(lowestPrice)}</Text>
+          <View style={styles.swatchRow}>
+            {uniqueColors.slice(0, 3).map((clr) => (
+              <View key={clr} style={styles.swatchItem}>
+                <View style={[styles.swatchDot, { backgroundColor: resolveColorSwatch(clr) }]} />
+                <Text style={styles.swatchText}>{clr}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      </InteractiveCard>
+
+      {/* Dedicated emerald pill action button kept outside InteractiveCard to avoid nested buttons */}
+      <EditorialButton
+        label={totalStock > 0 ? 'Thêm vào giỏ' : 'Xem chi tiết'}
+        onPress={totalStock > 0 ? onQuickAdd : onOpenDetail}
+        loading={busy}
+        compact
+        style={styles.cardCtaBtn}
+      />
     </View>
   );
 }
@@ -641,61 +823,50 @@ const styles = StyleSheet.create({
   content: {
     padding: spacing.xl,
     width: '100%',
-    gap: spacing.lg,
+    gap: spacing.xl,
     paddingBottom: spacing.xxxl,
   },
-  hero: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
+  mintHero: {
+    backgroundColor: colors.mintHero,
     borderRadius: radius.lg,
-    padding: spacing.xl,
+    padding: spacing.xxl,
     flexDirection: 'row',
     gap: spacing.xl,
     alignItems: 'center',
     overflow: 'hidden',
     position: 'relative',
   },
-  heroGlowRight: {
+  mintCircleBg: {
     position: 'absolute',
-    width: 340,
-    height: 340,
+    width: 420,
+    height: 420,
     borderRadius: 999,
-    backgroundColor: colors.accentSoft,
-    top: -150,
-    right: -70,
-    opacity: 0.72,
+    backgroundColor: colors.mintHeroAccent,
+    right: -80,
+    top: -110,
+    opacity: 0.75,
   },
-  heroGlowBottom: {
-    position: 'absolute',
-    width: 220,
-    height: 220,
-    borderRadius: 999,
-    backgroundColor: colors.warmHighlight,
-    bottom: -120,
-    left: 40,
-    opacity: 0.65,
-  },
-  heroCopy: {
-    flex: 1.6,
-    gap: spacing.sm,
+  mintHeroCopy: {
+    flex: 1.5,
+    gap: spacing.md,
     zIndex: 2,
   },
-  heroVisual: {
-    width: 190,
+  mintHeroVisual: {
+    width: 195,
     zIndex: 2,
   },
-  heroTitle: {
+  mintHeroTitle: {
     fontFamily: typography.serif,
-    fontSize: 30,
-    lineHeight: 38,
+    fontSize: 34,
+    fontWeight: '800',
+    lineHeight: 42,
     color: colors.ink,
   },
-  heroSubtitle: {
+  mintHeroSubtitle: {
     fontFamily: typography.sans,
-    fontSize: 14,
+    fontSize: 15,
     lineHeight: 22,
-    color: colors.muted,
+    color: '#3E4C46',
     maxWidth: 620,
   },
   heroActions: {
@@ -703,6 +874,109 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: spacing.sm,
     marginTop: spacing.xs,
+  },
+  sectionBlock: {
+    gap: spacing.md,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  sectionHeading: {
+    fontFamily: typography.serif,
+    fontSize: 20,
+    fontWeight: '700',
+    color: colors.ink,
+  },
+  sectionLink: {
+    fontFamily: typography.sans,
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.accent,
+  },
+  catStripRow: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    paddingVertical: 2,
+  },
+  catSpotlightCard: {
+    width: 156,
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.sm,
+    alignItems: 'center',
+    gap: 6,
+  },
+  catSpotlightActive: {
+    borderColor: colors.accent,
+    backgroundColor: colors.accentSoft,
+  },
+  catSpotlightTitle: {
+    fontFamily: typography.sans,
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.ink,
+  },
+  catSpotlightCount: {
+    fontFamily: typography.sans,
+    fontSize: 11,
+    color: colors.muted,
+  },
+  bestSellerPanel: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.lg,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.lg,
+    alignItems: 'stretch',
+  },
+  bestSellerPromo: {
+    width: 240,
+    flexGrow: 1,
+    backgroundColor: colors.oliveBanner,
+    borderRadius: radius.md,
+    padding: spacing.xl,
+    justifyContent: 'space-between',
+    gap: spacing.md,
+  },
+  promoHeadline: {
+    fontFamily: typography.serif,
+    fontSize: 22,
+    fontWeight: '800',
+    lineHeight: 28,
+    color: '#FFFFFF',
+  },
+  promoSub: {
+    fontFamily: typography.sans,
+    fontSize: 13,
+    lineHeight: 19,
+    color: 'rgba(255,255,255,0.9)',
+  },
+  promoWhiteBtn: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: 9,
+    borderRadius: radius.pill,
+  },
+  promoWhiteBtnText: {
+    fontFamily: typography.sans,
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.ink,
+  },
+  bestSellerCards: {
+    flex: 3,
+    minWidth: 280,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.md,
   },
   toolbarCard: {
     backgroundColor: colors.surface,
@@ -721,12 +995,27 @@ const styles = StyleSheet.create({
   },
   toolbarMeta: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: spacing.md,
+    flexWrap: 'wrap',
+  },
+  allProductsTitle: {
+    fontFamily: typography.sans,
+    fontSize: 16,
+    fontWeight: '800',
+    color: colors.ink,
   },
   resultCount: {
     fontFamily: typography.sans,
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.ink,
+    fontSize: 13,
+    fontWeight: '500',
+    color: colors.muted,
+  },
+  toolbarRightActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
   },
   toggleSidebarBtn: {
     paddingHorizontal: spacing.lg,
@@ -745,9 +1034,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: colors.accent,
   },
-  toggleSidebarTextActive: {
-    color: colors.accent,
-  },
   activeFilterRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -762,7 +1048,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     backgroundColor: colors.accentSoft,
     borderWidth: 1,
-    borderColor: '#CFDAEC',
+    borderColor: '#C5E4D1',
   },
   activeTagText: {
     fontFamily: typography.sans,
@@ -771,7 +1057,7 @@ const styles = StyleSheet.create({
     color: colors.accent,
   },
   desktopDockedSidebar: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceSoft,
     borderColor: colors.border,
     overflow: 'hidden',
   },
@@ -782,22 +1068,20 @@ const styles = StyleSheet.create({
   sidebarBody: {
     gap: spacing.md,
   },
-  sidebarHeader: {
+  sidebarTopBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingBottom: spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
   },
   sidebarTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
   },
-  sidebarTitle: {
-    fontFamily: typography.serif,
-    fontSize: 18,
+  sidebarMainHeading: {
+    fontFamily: typography.sans,
+    fontSize: 15,
+    fontWeight: '700',
     color: colors.ink,
   },
   countBadge: {
@@ -827,14 +1111,60 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.muted,
   },
-  sidebarSection: {
-    gap: spacing.xs,
-    paddingBottom: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+  sidebarBox: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    overflow: 'hidden',
   },
-  sidebarSectionLast: {
-    gap: spacing.xs,
+  sidebarBoxHeader: {
+    backgroundColor: colors.accent,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 10,
+  },
+  sidebarBoxHeaderText: {
+    fontFamily: typography.sans,
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    letterSpacing: 0.3,
+  },
+  sidebarBoxContent: {
+    padding: spacing.md,
+    gap: spacing.sm,
+  },
+  catTreeRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 7,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.xs,
+  },
+  catTreeRowActive: {
+    backgroundColor: colors.accentSoft,
+  },
+  catTreeText: {
+    fontFamily: typography.sans,
+    fontSize: 13,
+    color: colors.ink,
+    fontWeight: '500',
+  },
+  catTreeTextActive: {
+    color: colors.accent,
+    fontWeight: '700',
+  },
+  catTreePlus: {
+    fontFamily: typography.sans,
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.muted,
+  },
+  sidebarDivider: {
+    height: 1,
+    backgroundColor: colors.border,
+    marginVertical: 4,
   },
   searchInputWrap: {
     flexDirection: 'row',
@@ -843,12 +1173,12 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    minHeight: 42,
+    minHeight: 40,
     borderWidth: 1.5,
     borderColor: colors.border,
     borderRadius: radius.pill,
-    paddingHorizontal: spacing.lg,
-    paddingRight: 34,
+    paddingHorizontal: spacing.md,
+    paddingRight: 32,
     fontFamily: typography.sans,
     fontSize: 13,
     color: colors.ink,
@@ -903,9 +1233,10 @@ const styles = StyleSheet.create({
   },
   subLabel: {
     fontFamily: typography.sans,
-    fontSize: 12,
-    fontWeight: '700',
-    color: colors.muted,
+    fontSize: 11,
+    fontWeight: '800',
+    color: colors.ink,
+    letterSpacing: 0.4,
   },
   grid: {
     flexDirection: 'row',
@@ -920,59 +1251,70 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  card: {
+  cardWrap: {
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.lg,
+    borderRadius: radius.md,
     padding: spacing.md,
-    gap: spacing.md,
+    gap: spacing.sm,
+    justifyContent: 'space-between',
+  },
+  card: {
+    borderRadius: radius.sm,
+    gap: spacing.sm,
     flex: 1,
+    backgroundColor: colors.surface,
+  },
+  cardArtWrap: {
+    position: 'relative',
+  },
+  cardBadge: {
+    position: 'absolute',
+    top: 10,
+    left: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: radius.pill,
+  },
+  cardBadgeText: {
+    fontFamily: typography.sans,
+    fontSize: 11,
+    fontWeight: '700',
   },
   cardBody: {
-    gap: spacing.xs,
+    gap: 4,
+    alignItems: 'center',
     paddingHorizontal: spacing.xs,
-    paddingBottom: spacing.xs,
   },
   cardTitle: {
-    fontFamily: typography.serif,
-    fontSize: 16,
-    color: colors.ink,
-  },
-  cardMetaRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  cardPrice: {
     fontFamily: typography.sans,
     fontSize: 15,
     fontWeight: '700',
     color: colors.ink,
+    textAlign: 'center',
+  },
+  cardPrice: {
+    fontFamily: typography.sans,
+    fontSize: 15,
+    fontWeight: '800',
+    color: colors.accent,
     fontVariant: ['tabular-nums'],
   },
-  stockPill: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 3,
-    borderRadius: radius.pill,
-    backgroundColor: colors.surfaceSoft,
-  },
-  cardStock: {
-    fontFamily: typography.sans,
-    fontSize: 12,
-    fontWeight: '500',
-    color: colors.muted,
+  cardCtaBtn: {
+    width: '100%',
   },
   swatchRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    justifyContent: 'center',
     gap: spacing.sm,
-    marginTop: 4,
+    marginTop: 2,
   },
   swatchItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 4,
   },
   swatchDot: {
     width: 10,
@@ -983,7 +1325,7 @@ const styles = StyleSheet.create({
   },
   swatchText: {
     fontFamily: typography.sans,
-    fontSize: 12,
+    fontSize: 11,
     color: colors.muted,
   },
   loadMoreWrap: {
@@ -1007,7 +1349,7 @@ const styles = StyleSheet.create({
     width: '86%',
     maxWidth: 340,
     height: '100%',
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceSoft,
     padding: spacing.lg,
     borderTopLeftRadius: radius.lg,
     borderBottomLeftRadius: radius.lg,
