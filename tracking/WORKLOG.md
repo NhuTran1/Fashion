@@ -281,3 +281,20 @@
 - PASS: kiểm tra ignore, giữ env ví dụ/lockfile trong phạm vi theo dõi và rà ứng viên theo mẫu secret bằng Python. Không in giá trị phát hiện. Kiểm thử ứng dụng NOT RUN.
 - Đã stage danh sách 63 file được rà. Kiểm tra lại 63 blob trong index không phát hiện mẫu secret. Cấu hình Codex và báo cáo Word để ngoài index. Chưa tạo commit.
 - M2-02 REVIEW. M2-01 vẫn chờ shell Expo.
+
+
+## 2026-11-24 — M2-01 / M1-09 / M1-10 (Frontend Expo + Mock OpenAPI v1.0.0) — Nhánh feat/frontend-expo-mock
+- Status: REVIEW, chờ chủ dự án kiểm tra và nghiệm thu trên nhánh `feat/frontend-expo-mock`.
+- Scope / changed files:
+  - Scaffold `apps/mobile/` (Expo SDK 58 + React Native Web + TypeScript + `expo-secure-store`), cập nhật `package-lock.json` ở root workspace.
+  - `src/types/api.ts`: Khai báo đầy đủ DTO, ID chuỗi số, tiền Decimal 2 chữ số, Error payload và Staff RBAC theo `contracts/openapi.yaml` v1.0.0 & `docs/06-RBAC.md`.
+  - `src/mock/seedData.ts`, `src/mock/mockServer.ts`, `src/api/client.ts`, `src/api/sessionStore.ts`: Mock backend stateful toàn bộ 41+ thao tác OpenAPI v1.0.0, ADR-0003 session/CSRF, idempotency checkout 201/200/409, hoàn tồn một lần, verified-purchase review, Admin audit logs và giả lập lỗi QA Sim.
+  - `src/screens/customer/*` & `src/screens/admin/*`: Hoàn thiện toàn bộ luồng Customer (Catalog, Chi tiết/Biến thể/Đánh giá, Auth, Địa chỉ, Giỏ hàng, Checkout COD mô phỏng, Lịch sử/Hủy/Đánh giá) và Admin Web-first + Staff MVP B RBAC preview (Catalog, Tồn kho, Đơn hàng & Thu COD, Kiểm duyệt Đánh giá, Tài khoản & Audit).
+- Actual commands and results:
+  - `npm run typecheck --workspace apps/mobile`: PASS (0 errors).
+  - `npm run typecheck --workspace apps/api`: PASS (0 errors).
+  - `node /tmp/fashion-mock-test/scripts/verifyMockContracts.js`: PASS (`ALL OPENAPI v1.0.0 & RBAC v1 MOCK CONTRACT CHECKS PASSED`).
+  - `cd apps/mobile && EXPO_NO_TELEMETRY=1 HOME=/tmp npx expo export --platform web --output-dir /tmp/fashion-web-dist`: PASS (221 modules bundled, 587KB web bundle).
+  - Playwright Chromium E2E Smoke Test (`http://127.0.0.1:4173`): PASS (0 console/page errors — verified Catalog pagination, Product Detail, Customer login, Cart -> COD Checkout 201, Customer 403 Admin guard, Admin login).
+  - Android runtime / live NestJS MySQL integration: NOT RUN (backend API endpoints chưa triển khai trong `apps/api`).
+- Next task: Chủ dự án review nhánh `feat/frontend-expo-mock`, chạy `npm run web --workspace apps/mobile` hoặc tích hợp với backend NestJS khi Codex hoàn thành M2–M6.

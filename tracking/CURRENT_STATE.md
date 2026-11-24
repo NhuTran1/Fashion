@@ -1,11 +1,11 @@
 # CURRENT_STATE — snapshot ngắn cho AI
 
-**Updated:** 2026-11-20 (M2-02 chờ nghiệm thu).  
-**10-step process:** Chuẩn bị nền tảng triển khai. **PRD v1, M0 và M1 gate đã được phê duyệt.**  
+**Updated:** 2026-11-24 (Frontend Expo + Mock OpenAPI v1.0.0 trên nhánh `feat/frontend-expo-mock`, chờ nghiệm thu).  
+**10-step process:** Chuẩn bị nền tảng triển khai & hoàn thiện Frontend trên nhánh tách riêng. **PRD v1, M0 và M1 gate đã được phê duyệt.**  
 **Product:** MVP A Customer + Admin → MVP B Staff → AI image try-on độc lập.  
-**Milestone active:** M2 — nền tảng. Chủ dự án đã duyệt phạm vi scaffold M2-01.  
-**Current task:** M2-02 — REVIEW. Git local, quy tắc ignore, env mẫu và README đã rà soát. M2-01 còn chờ shell Expo và bằng chứng khởi động Mobile. M1-09/M1-10 tiếp tục theo dõi riêng.  
-**Repository code:** Có `apps/api` và lockfile ở root. Chưa có `apps/mobile/package.json` tại thời điểm kiểm tra. Git ở nhánh `main`, chưa có commit.
+**Milestone active:** M2 — nền tảng & Frontend Expo/Web.  
+**Current task:** M2-01 / M1-09 / M1-10 (Frontend) — REVIEW trên nhánh `feat/frontend-expo-mock`. Đã scaffold `apps/mobile` (Expo SDK 58 + TypeScript + React Native Web), mock server stateful khớp OpenAPI v1.0.0, đủ luồng Customer & Admin/Staff RBAC cùng typecheck, mock contract tests và Playwright Web E2E PASS.  
+**Repository code:** Có `apps/api` (scaffold), `apps/mobile` (Expo TypeScript frontend hoàn chỉnh dùng Mock OpenAPI v1.0.0 mặc định) và `package-lock.json` ở root. Đang ở nhánh `feat/frontend-expo-mock`.
 
 ## Quyết định người dùng đã xác nhận
 - Single-vendor fashion e-commerce, không Seller/multi-vendor.
