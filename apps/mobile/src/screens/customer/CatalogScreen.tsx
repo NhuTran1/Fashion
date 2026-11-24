@@ -3,6 +3,7 @@ import {
   Animated,
   Easing,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -18,7 +19,9 @@ import {
   InteractiveCard,
   ShimmerBlock,
 } from '../../components/Motion';
+import { QuickViewModal } from '../../components/QuickViewModal';
 import { EditorialButton, GarmentArtwork, StateCard } from '../../components/UiPrimitives';
+import { VoucherStrip } from '../../components/VoucherStrip';
 import { useApp } from '../../state/AppContext';
 import {
   colors,
@@ -39,17 +42,19 @@ const SORT_OPTIONS: Array<{ value: ProductSort; label: string }> = [
   { value: 'PRICE_DESC', label: 'Giá giảm dần' },
 ];
 
+const USE_NATIVE_DRIVER = Platform.OS !== 'web';
+
 /**
- * Full-screen Fashion Storefront modeled after Bean Farm's bright, high-conversion layout:
- * - Soft Mint Hero Banner (#DDF3E8)
- * - "Danh mục nổi bật" category strip
- * - "Bán chạy nhất hàng ngày" olive-emerald spotlight block
- * - "TẤT CẢ SẢN PHẨM" grid with tall 3:4 portrait garment cards & emerald "Thêm vào giỏ" pills
- * - Collapsible right-hand docked sidebar with green headers ("DANH MỤC SẢN PHẨM" & "BỘ LỌC SẢN PHẨM")
+ * Full-screen Fashion Storefront supporting two distinct views:
+ * - "home" (Trang chủ): Mint Hero -> Danh mục nổi bật -> VoucherStrip -> Bán chạy nhất -> Tất cả sản phẩm
+ * - "products" (Sản phẩm): Dedicated atmospheric "Tất cả sản phẩm" banner with circular category shortcuts -> Product Grid
+ * Both views feature multi-color interactive swatches, hover quick-actions, Quick View modal, and right filter sidebar.
  */
 export function CatalogScreen({
+  viewMode = 'home',
   externalSearch,
 }: {
+  viewMode?: 'home' | 'products';
   externalSearch?: { q: string; nonce: number } | null;
 }): React.ReactElement {
   const { user, navigate, refreshCart, handleApiError, showToast } = useApp();
@@ -73,12 +78,15 @@ export function CatalogScreen({
 
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(width >= 920);
   const [quickAddBusyId, setQuickAddBusyId] = useState<EntityId | null>(null);
+  const [quickViewState, setQuickViewState] = useState<{
+    product: Product;
+    color?: string;
+  } | null>(null);
 
   const [loading, setLoading] = useState<boolean>(true);
   const [loadingMore, setLoadingMore] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Sync top header search bar queries into Catalog search state.
   useEffect(() => {
     if (externalSearch) {
       setSearchInput(externalSearch.q);
@@ -160,13 +168,17 @@ export function CatalogScreen({
     setSort('NEWEST');
   };
 
-  /** Add first in-stock variant quickly from product card or redirect Guest/out-of-stock to detail/login. */
-  const handleQuickAddToCart = async (product: Product) => {
-    const firstAvailable = product.variants.find(
-      (v) => v.status === 'ACTIVE' && v.stockQuantity > 0,
-    );
+  /** Add first in-stock variant matching optional preferredColor directly to Customer cart. */
+  const handleQuickAddToCart = async (product: Product, preferredColor?: string) => {
+    const colorMatch = preferredColor
+      ? product.variants.find(
+          (v) => v.status === 'ACTIVE' && v.color === preferredColor && v.stockQuantity > 0,
+        )
+      : undefined;
+    const firstAvailable =
+      colorMatch ?? product.variants.find((v) => v.status === 'ACTIVE' && v.stockQuantity > 0);
     if (!firstAvailable) {
-      navigate({ name: 'product', productId: product.id });
+      navigate({ name: 'product', productId: product.id, initialColor: preferredColor });
       return;
     }
     if (!user) {
@@ -246,7 +258,7 @@ export function CatalogScreen({
         </Pressable>
       </View>
 
-      {/* Card 1: DANH MỤC SẢN PHẨM (Bean Farm emerald header box) */}
+      {/* Card 1: DANH MỤC SẢN PHẨM */}
       <View style={styles.sidebarBox}>
         <View style={styles.sidebarBoxHeader}>
           <Text style={styles.sidebarBoxHeaderText}>DANH MỤC SẢN PHẨM</Text>
@@ -281,7 +293,7 @@ export function CatalogScreen({
         </View>
       </View>
 
-      {/* Card 2: BỘ LỌC SẢN PHẨM (Search + Size + Color + Sort) */}
+      {/* Card 2: BỘ LỌC SẢN PHẨM */}
       <View style={styles.sidebarBox}>
         <View style={styles.sidebarBoxHeader}>
           <Text style={styles.sidebarBoxHeaderText}>BỘ LỌC SẢN PHẨM</Text>
@@ -374,87 +386,157 @@ export function CatalogScreen({
     <View style={[styles.pageRoot, isDesktop && styles.pageRootDesktop]}>
       {/* Left/Main Full-Screen Scrollable Storefront */}
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-        {/* 1. Mint Promotional Hero Banner (Bean Farm Screenshot 3 style) */}
-        <FadeSlideIn distance={14} duration={360}>
-          <View style={[styles.mintHero, shadows.card]}>
-            <View style={styles.mintCircleBg} />
-            <View style={styles.mintHeroCopy}>
-              <Text style={styles.mintHeroTitle}>
-                Thời Trang Tự Nhiên{'\n'}Chuẩn Phom Hàng Ngày
+        {viewMode === 'products' ? (
+          /* Dedicated "Sản phẩm" Page Banner (Bean Farm Screenshot 1 style) */
+          <FadeSlideIn distance={12} duration={340}>
+            <View style={[styles.productsBanner, shadows.card]}>
+              <Text style={styles.productsBannerTitle}>
+                {selectedCategoryName ? selectedCategoryName : 'Tất cả sản phẩm'}
               </Text>
-              <Text style={styles.mintHeroSubtitle}>
-                Miễn phí giao hàng toàn quốc đơn COD mô phỏng. Chất liệu linen, cotton 260gsm và
-                len merino chọn lọc.
-              </Text>
-              <View style={styles.heroActions}>
-                <EditorialButton label="ĐẶT NGAY" onPress={clearFilters} />
-                <EditorialButton
-                  label="Đơn hàng của tôi"
-                  variant="secondary"
-                  onPress={() => navigate({ name: 'orders' })}
-                />
+              <View style={styles.breadcrumbBar}>
+                <Pressable onPress={() => navigate({ name: 'catalog', view: 'home' })}>
+                  <Text style={styles.breadcrumbLink}>Trang chủ</Text>
+                </Pressable>
+                <Text style={styles.breadcrumbSep}>›</Text>
+                <Text style={styles.breadcrumbCurrent}>
+                  {selectedCategoryName ? selectedCategoryName : 'Tất cả sản phẩm'}
+                </Text>
               </View>
-            </View>
 
-            {width >= 720 ? (
-              <FloatingAmbient style={styles.mintHeroVisual}>
-                <View style={shadows.lifted}>
-                  <GarmentArtwork
-                    uri="garment://%231E3A5F/coat/S%E1%BB%9EI%20Lookbook"
-                    altText="Bộ sưu tập Sợi Fashion"
-                    height={215}
-                  />
-                </View>
-              </FloatingAmbient>
-            ) : null}
-          </View>
-        </FadeSlideIn>
-
-        {/* 2. "Danh mục nổi bật" Horizontal Strip (Bean Farm Screenshot 3) */}
-        {categories.length > 0 ? (
-          <View style={styles.sectionBlock}>
-            <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionHeading}>Danh mục nổi bật</Text>
-              <Pressable onPress={() => setSelectedCategoryId(undefined)}>
-                <Text style={styles.sectionLink}>Xem tất cả</Text>
-              </Pressable>
-            </View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <View style={styles.catStripRow}>
-                {categories.map((cat) => {
-                  const catProducts = allActiveProducts.filter((p) => p.categoryId === cat.id);
-                  const repImage = catProducts[0]?.images[0]?.url;
-                  const active = selectedCategoryId === cat.id;
-                  return (
-                    <Pressable
-                      key={cat.id}
-                      onPress={() => setSelectedCategoryId(active ? undefined : cat.id)}
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <View style={styles.circleCatRow}>
+                  <Pressable
+                    onPress={() => setSelectedCategoryId(undefined)}
+                    style={styles.circleCatItem}
+                  >
+                    <View
                       style={[
-                        styles.catSpotlightCard,
-                        shadows.soft,
-                        active && styles.catSpotlightActive,
+                        styles.circleCatRing,
+                        !selectedCategoryId && styles.circleCatRingActive,
                       ]}
                     >
-                      <GarmentArtwork
-                        uri={repImage}
-                        altText={cat.name}
-                        height={110}
-                        hideCaption
-                      />
-                      <Text style={styles.catSpotlightTitle} numberOfLines={1}>
-                        {cat.name}
-                      </Text>
-                      <Text style={styles.catSpotlightCount}>{catProducts.length} sản phẩm</Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            </ScrollView>
-          </View>
-        ) : null}
+                      <Text style={styles.circleCatAll}>ALL</Text>
+                    </View>
+                    <Text style={styles.circleCatLabel}>Tất cả</Text>
+                  </Pressable>
+                  {categories.map((cat) => {
+                    const catProducts = allActiveProducts.filter((p) => p.categoryId === cat.id);
+                    const repImage = catProducts[0]?.images[0]?.url;
+                    const active = selectedCategoryId === cat.id;
+                    return (
+                      <Pressable
+                        key={cat.id}
+                        onPress={() => setSelectedCategoryId(active ? undefined : cat.id)}
+                        style={styles.circleCatItem}
+                      >
+                        <View style={[styles.circleCatRing, active && styles.circleCatRingActive]}>
+                          <GarmentArtwork
+                            uri={repImage}
+                            altText={cat.name}
+                            height={72}
+                            hideCaption
+                          />
+                        </View>
+                        <Text style={styles.circleCatLabel} numberOfLines={1}>
+                          {cat.name}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </ScrollView>
+            </View>
+          </FadeSlideIn>
+        ) : (
+          /* "Trang chủ" Mint Promotional Hero Banner + Danh mục nổi bật + Bán chạy nhất */
+          <>
+            <FadeSlideIn distance={14} duration={360}>
+              <View style={[styles.mintHero, shadows.card]}>
+                <View style={styles.mintCircleBg} />
+                <View style={styles.mintHeroCopy}>
+                  <Text style={styles.mintHeroTitle}>
+                    Thời Trang Tự Nhiên{'\n'}Chuẩn Phom Hàng Ngày
+                  </Text>
+                  <Text style={styles.mintHeroSubtitle}>
+                    Miễn phí giao hàng toàn quốc đơn COD mô phỏng. Chất liệu linen, cotton 260gsm và
+                    len merino chọn lọc.
+                  </Text>
+                  <View style={styles.heroActions}>
+                    <EditorialButton
+                      label="ĐẶT NGAY"
+                      onPress={() => navigate({ name: 'catalog', view: 'products' })}
+                    />
+                    <EditorialButton
+                      label="Đơn hàng của tôi"
+                      variant="secondary"
+                      onPress={() => navigate({ name: 'orders' })}
+                    />
+                  </View>
+                </View>
 
-        {/* 3. "Bán chạy nhất hàng ngày" Olive-Emerald Promo Block (Bean Farm Screenshot 4) */}
-        {spotlightProducts.length > 0 && activeFilterCount === 0 ? (
+                {width >= 720 ? (
+                  <FloatingAmbient style={styles.mintHeroVisual}>
+                    <View style={shadows.lifted}>
+                      <GarmentArtwork
+                        uri="garment://%231E3A5F/coat/S%E1%BB%9EI%20Lookbook"
+                        altText="Bộ sưu tập Sợi Fashion"
+                        height={215}
+                      />
+                    </View>
+                  </FloatingAmbient>
+                ) : null}
+              </View>
+            </FadeSlideIn>
+
+            {categories.length > 0 ? (
+              <View style={styles.sectionBlock}>
+                <View style={styles.sectionHeaderRow}>
+                  <Text style={styles.sectionHeading}>Danh mục nổi bật</Text>
+                  <Pressable onPress={() => navigate({ name: 'catalog', view: 'products' })}>
+                    <Text style={styles.sectionLink}>Xem tất cả</Text>
+                  </Pressable>
+                </View>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  <View style={styles.catStripRow}>
+                    {categories.map((cat) => {
+                      const catProducts = allActiveProducts.filter((p) => p.categoryId === cat.id);
+                      const repImage = catProducts[0]?.images[0]?.url;
+                      const active = selectedCategoryId === cat.id;
+                      return (
+                        <Pressable
+                          key={cat.id}
+                          onPress={() => setSelectedCategoryId(active ? undefined : cat.id)}
+                          style={[
+                            styles.catSpotlightCard,
+                            shadows.soft,
+                            active && styles.catSpotlightActive,
+                          ]}
+                        >
+                          <GarmentArtwork
+                            uri={repImage}
+                            altText={cat.name}
+                            height={110}
+                            hideCaption
+                          />
+                          <Text style={styles.catSpotlightTitle} numberOfLines={1}>
+                            {cat.name}
+                          </Text>
+                          <Text style={styles.catSpotlightCount}>{catProducts.length} sản phẩm</Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </ScrollView>
+              </View>
+            ) : null}
+          </>
+        )}
+
+        {/* Voucher Ticket Strip (Sudes Fashion inspired) shown on both Home and Products */}
+        <VoucherStrip />
+
+        {/* "Bán chạy nhất hàng ngày" Spotlight on Home view */}
+        {viewMode === 'home' && spotlightProducts.length > 0 && activeFilterCount === 0 ? (
           <View style={[styles.bestSellerPanel, shadows.card]}>
             <View style={styles.bestSellerPromo}>
               <Text style={styles.promoHeadline}>Bán chạy nhất hàng ngày</Text>
@@ -462,10 +544,10 @@ export function CatalogScreen({
                 Ưu đãi độc quyền - Giá tốt từ 290.000₫. Đặt COD mô phỏng ngay hôm nay.
               </Text>
               <Pressable
-                onPress={() => navigate({ name: 'product', productId: spotlightProducts[0].id })}
+                onPress={() => navigate({ name: 'catalog', view: 'products' })}
                 style={styles.promoWhiteBtn}
               >
-                <Text style={styles.promoWhiteBtnText}>Mua ngay</Text>
+                <Text style={styles.promoWhiteBtnText}>Xem tất cả</Text>
               </Pressable>
             </View>
 
@@ -479,15 +561,18 @@ export function CatalogScreen({
                   badgeColor={colors.amber}
                   badgeTextColor={colors.amberInk}
                   busy={quickAddBusyId === prod.id}
-                  onOpenDetail={() => navigate({ name: 'product', productId: prod.id })}
-                  onQuickAdd={() => void handleQuickAddToCart(prod)}
+                  onOpenDetail={(color) =>
+                    navigate({ name: 'product', productId: prod.id, initialColor: color })
+                  }
+                  onQuickView={(color) => setQuickViewState({ product: prod, color })}
+                  onQuickAdd={(color) => void handleQuickAddToCart(prod, color)}
                 />
               ))}
             </View>
           </View>
         ) : null}
 
-        {/* 4. "TẤT CẢ SẢN PHẨM" Toolbar & Active Filters */}
+        {/* "TẤT CẢ SẢN PHẨM" Toolbar & Active Filters */}
         <View style={[styles.toolbarCard, shadows.soft]}>
           <View style={styles.toolbarTop}>
             <View style={styles.toolbarMeta}>
@@ -551,7 +636,7 @@ export function CatalogScreen({
           ) : null}
         </View>
 
-        {/* 5. Main Tall 3:4 Rectangular Portrait Product Grid */}
+        {/* Main Tall 3:4 Rectangular Portrait Product Grid */}
         {loading && products.length === 0 ? (
           <View style={styles.grid}>
             {[0, 1, 2].map((idx) => (
@@ -616,8 +701,11 @@ export function CatalogScreen({
                       badgeColor={colors.coralRed}
                       badgeTextColor="#FFFFFF"
                       busy={quickAddBusyId === product.id}
-                      onOpenDetail={() => navigate({ name: 'product', productId: product.id })}
-                      onQuickAdd={() => void handleQuickAddToCart(product)}
+                      onOpenDetail={(color) =>
+                        navigate({ name: 'product', productId: product.id, initialColor: color })
+                      }
+                      onQuickView={(color) => setQuickViewState({ product, color })}
+                      onQuickAdd={(color) => void handleQuickAddToCart(product, color)}
                     />
                   </FadeSlideIn>
                 );
@@ -640,7 +728,7 @@ export function CatalogScreen({
         )}
       </ScrollView>
 
-      {/* Full-height Docked Right Sidebar on Desktop — flush with header, zero scroll gap */}
+      {/* Full-height Docked Right Sidebar on Desktop — flush with header */}
       {isDesktop ? (
         <Animated.View
           style={[
@@ -684,11 +772,27 @@ export function CatalogScreen({
           </View>
         </Modal>
       ) : null}
+
+      {/* Quick View Modal triggered from Hover Overlay */}
+      <QuickViewModal
+        product={quickViewState?.product ?? null}
+        initialColor={quickViewState?.color}
+        onClose={() => setQuickViewState(null)}
+        onOpenFullDetail={(pid, color) =>
+          navigate({ name: 'product', productId: pid, initialColor: color })
+        }
+        onStockChanged={() => void fetchProducts(1, false)}
+      />
     </View>
   );
 }
 
-/** Bean Farm inspired product card with tall 3:4 portrait garment visual and emerald pill CTA. */
+/**
+ * Interactive multi-color product card featuring:
+ * - Tall 3:4 portrait garment visual that updates dynamically when choosing color swatches
+ * - Smooth floating Hover Action Toolbar on Web (Tùy chọn / Xem nhanh / Thêm giỏ)
+ * - Clickable circular color swatches with active ring indicator
+ */
 function ProductPortraitCard({
   product,
   widthPercent,
@@ -697,6 +801,7 @@ function ProductPortraitCard({
   badgeTextColor,
   busy,
   onOpenDetail,
+  onQuickView,
   onQuickAdd,
 }: {
   product: Product;
@@ -705,17 +810,45 @@ function ProductPortraitCard({
   badgeColor: string;
   badgeTextColor: string;
   busy: boolean;
-  onOpenDetail: () => void;
-  onQuickAdd: () => void;
+  onOpenDetail: (selectedColor?: string) => void;
+  onQuickView: (selectedColor?: string) => void;
+  onQuickAdd: (selectedColor?: string) => void;
 }): React.ReactElement {
-  const lowestPrice = getLowestActivePrice(product);
-  const totalStock = getTotalActiveStock(product);
   const uniqueColors = Array.from(new Set(product.variants.map((v) => v.color)));
+  const uniqueSizes = Array.from(new Set(product.variants.map((v) => v.size)));
+  const [selectedColor, setSelectedColor] = useState<string | undefined>(uniqueColors[0]);
+  const [hovered, setHovered] = useState(false);
+
+  const hoverAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(hoverAnim, {
+      toValue: hovered ? 1 : 0,
+      duration: 180,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: USE_NATIVE_DRIVER,
+    }).start();
+  }, [hoverAnim, hovered]);
+
+  // Compute price for currently selected color swatch or fall back to lowest active price.
+  const colorVariant = selectedColor
+    ? product.variants.find((v) => v.color === selectedColor && v.status === 'ACTIVE')
+    : undefined;
+  const displayPrice = colorVariant ? colorVariant.price : getLowestActivePrice(product);
+  const totalStock = getTotalActiveStock(product);
 
   return (
-    <View style={[styles.cardWrap, { width: widthPercent }]}>
+    <View
+      style={[styles.cardWrap, shadows.soft, { width: widthPercent }]}
+      // Web hover triggers floating action pills cleanly without nested Pressables
+      {...(Platform.OS === 'web'
+        ? {
+            onMouseEnter: () => setHovered(true),
+            onMouseLeave: () => setHovered(false),
+          }
+        : {})}
+    >
       <InteractiveCard
-        onPress={onOpenDetail}
+        onPress={() => onOpenDetail(selectedColor)}
         style={styles.card}
         accessibilityLabel={product.name}
       >
@@ -724,34 +857,108 @@ function ProductPortraitCard({
             uri={product.images[0]?.url}
             altText={product.images[0]?.altText || product.name}
             aspectRatio={3 / 4}
+            overrideToneHex={selectedColor ? resolveColorSwatch(selectedColor) : undefined}
           />
           {badgeText ? (
             <View style={[styles.cardBadge, { backgroundColor: badgeColor }]}>
               <Text style={[styles.cardBadgeText, { color: badgeTextColor }]}>{badgeText}</Text>
             </View>
           ) : null}
-        </View>
 
-        <View style={styles.cardBody}>
-          <Text style={styles.cardTitle} numberOfLines={1}>
-            {product.name}
-          </Text>
-          <Text style={styles.cardPrice}>{formatVnd(lowestPrice)}</Text>
-          <View style={styles.swatchRow}>
-            {uniqueColors.slice(0, 3).map((clr) => (
-              <View key={clr} style={styles.swatchItem}>
-                <View style={[styles.swatchDot, { backgroundColor: resolveColorSwatch(clr) }]} />
-                <Text style={styles.swatchText}>{clr}</Text>
-              </View>
-            ))}
+          <View style={styles.freeshipPill}>
+            <Text style={styles.freeshipText}>FREESHIP</Text>
           </View>
         </View>
       </InteractiveCard>
 
-      {/* Dedicated emerald pill action button kept outside InteractiveCard to avoid nested buttons */}
+      {/* Floating Hover Action Icons (positioned cleanly over the 3:4 artwork when hovered on Web) */}
+      <Animated.View
+        pointerEvents={hovered ? 'auto' : 'none'}
+        style={[
+          styles.hoverToolbar,
+          {
+            opacity: hoverAnim,
+            transform: [
+              {
+                translateY: hoverAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [8, 0],
+                }),
+              },
+            ],
+          },
+        ]}
+      >
+        <Pressable
+          onPress={() => onOpenDetail(selectedColor)}
+          style={[styles.hoverCircleBtn, shadows.card]}
+          accessibilityLabel={`Tùy chọn ${product.name}`}
+        >
+          <Text style={styles.hoverIconText}>⚙</Text>
+        </Pressable>
+        <Pressable
+          onPress={() => onQuickView(selectedColor)}
+          style={[styles.hoverCircleBtn, shadows.card]}
+          accessibilityLabel={`Xem nhanh ${product.name}`}
+        >
+          <Text style={styles.hoverIconText}>👁</Text>
+        </Pressable>
+        <Pressable
+          onPress={() => onQuickAdd(selectedColor)}
+          style={[styles.hoverCircleBtn, styles.hoverCircleAccent, shadows.card]}
+          accessibilityLabel={`Thêm nhanh ${product.name}`}
+        >
+          <Text style={[styles.hoverIconText, { color: '#FFFFFF' }]}>＋</Text>
+        </Pressable>
+      </Animated.View>
+
+      {/* Product meta, interactive circular multi-color swatches, price, and emerald pill CTA */}
+      <View style={styles.cardBody}>
+        <Pressable onPress={() => onOpenDetail(selectedColor)}>
+          <Text style={styles.cardTitle} numberOfLines={2}>
+            {product.name}
+          </Text>
+        </Pressable>
+
+        <View style={styles.cardSubMetaRow}>
+          <Text style={styles.cardSizeSummary}>
+            Size {uniqueSizes[0]}–{uniqueSizes[uniqueSizes.length - 1]} ({uniqueSizes.length} size)
+          </Text>
+          <Text style={styles.cardStockMini}>
+            {totalStock > 0 ? `Còn ${totalStock}` : 'Hết hàng'}
+          </Text>
+        </View>
+
+        {/* Interactive circular color swatches */}
+        <View style={styles.swatchCircleRow}>
+          {uniqueColors.slice(0, 4).map((clr) => {
+            const active = selectedColor === clr;
+            return (
+              <Pressable
+                key={clr}
+                onPress={() => setSelectedColor(clr)}
+                onHoverIn={() => setSelectedColor(clr)}
+                style={[styles.swatchCircleOuter, active && styles.swatchCircleOuterActive]}
+                accessibilityLabel={`Màu ${clr}`}
+              >
+                <View
+                  style={[styles.swatchCircleInner, { backgroundColor: resolveColorSwatch(clr) }]}
+                />
+              </Pressable>
+            );
+          })}
+          {uniqueColors.length > 4 ? (
+            <Text style={styles.moreColorText}>+{uniqueColors.length - 4}</Text>
+          ) : null}
+          {selectedColor ? <Text style={styles.selectedColorName}>{selectedColor}</Text> : null}
+        </View>
+
+        <Text style={styles.cardPrice}>{formatVnd(displayPrice)}</Text>
+      </View>
+
       <EditorialButton
         label={totalStock > 0 ? 'Thêm vào giỏ' : 'Xem chi tiết'}
-        onPress={totalStock > 0 ? onQuickAdd : onOpenDetail}
+        onPress={() => (totalStock > 0 ? onQuickAdd(selectedColor) : onOpenDetail(selectedColor))}
         loading={busy}
         compact
         style={styles.cardCtaBtn}
@@ -825,6 +1032,78 @@ const styles = StyleSheet.create({
     width: '100%',
     gap: spacing.xl,
     paddingBottom: spacing.xxxl,
+  },
+  productsBanner: {
+    backgroundColor: '#163D29',
+    borderRadius: radius.lg,
+    padding: spacing.xl,
+    gap: spacing.md,
+    alignItems: 'center',
+  },
+  productsBannerTitle: {
+    fontFamily: typography.serif,
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  breadcrumbBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  breadcrumbLink: {
+    fontFamily: typography.sans,
+    fontSize: 13,
+    color: '#DDF3E8',
+    fontWeight: '600',
+  },
+  breadcrumbSep: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 13,
+  },
+  breadcrumbCurrent: {
+    fontFamily: typography.sans,
+    fontSize: 13,
+    color: colors.amber,
+    fontWeight: '700',
+  },
+  circleCatRow: {
+    flexDirection: 'row',
+    gap: spacing.lg,
+    paddingTop: spacing.xs,
+  },
+  circleCatItem: {
+    alignItems: 'center',
+    gap: 6,
+    width: 96,
+  },
+  circleCatRing: {
+    width: 78,
+    height: 78,
+    borderRadius: 99,
+    backgroundColor: '#FFFFFF',
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: 'transparent',
+    padding: 3,
+  },
+  circleCatRingActive: {
+    borderColor: colors.amber,
+  },
+  circleCatAll: {
+    fontFamily: typography.sans,
+    fontSize: 15,
+    fontWeight: '800',
+    color: colors.accent,
+  },
+  circleCatLabel: {
+    fontFamily: typography.sans,
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    textAlign: 'center',
   },
   mintHero: {
     backgroundColor: colors.mintHero,
@@ -1048,7 +1327,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     backgroundColor: colors.accentSoft,
     borderWidth: 1,
-    borderColor: '#C5E4D1',
+    borderColor: '#BEE4CE',
   },
   activeTagText: {
     fontFamily: typography.sans,
@@ -1259,11 +1538,11 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     gap: spacing.sm,
     justifyContent: 'space-between',
+    position: 'relative',
   },
   card: {
     borderRadius: radius.sm,
-    gap: spacing.sm,
-    flex: 1,
+    gap: spacing.xs,
     backgroundColor: colors.surface,
   },
   cardArtWrap: {
@@ -1282,21 +1561,119 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
   },
-  cardBody: {
-    gap: 4,
+  freeshipPill: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    backgroundColor: 'rgba(14, 138, 68, 0.9)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: radius.pill,
+  },
+  freeshipText: {
+    fontFamily: typography.sans,
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  hoverToolbar: {
+    position: 'absolute',
+    top: 132,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: spacing.xs,
+    gap: spacing.sm,
+    zIndex: 10,
+  },
+  hoverCircleBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 99,
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  hoverCircleAccent: {
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
+  },
+  hoverIconText: {
+    fontSize: 16,
+    color: colors.ink,
+    fontWeight: '700',
+  },
+  cardBody: {
+    gap: 5,
+    paddingHorizontal: 2,
   },
   cardTitle: {
     fontFamily: typography.sans,
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '700',
     color: colors.ink,
-    textAlign: 'center',
+    minHeight: 38,
+  },
+  cardSubMetaRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  cardSizeSummary: {
+    fontFamily: typography.sans,
+    fontSize: 11,
+    color: colors.muted,
+  },
+  cardStockMini: {
+    fontFamily: typography.sans,
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.accent,
+  },
+  swatchCircleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginVertical: 2,
+  },
+  swatchCircleOuter: {
+    width: 22,
+    height: 22,
+    borderRadius: 99,
+    borderWidth: 1.5,
+    borderColor: colors.borderStrong,
+    padding: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  swatchCircleOuterActive: {
+    borderColor: colors.accent,
+    borderWidth: 2,
+  },
+  swatchCircleInner: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 99,
+  },
+  moreColorText: {
+    fontFamily: typography.sans,
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.muted,
+  },
+  selectedColorName: {
+    fontFamily: typography.sans,
+    fontSize: 11,
+    color: colors.muted,
+    marginLeft: 2,
   },
   cardPrice: {
     fontFamily: typography.sans,
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '800',
     color: colors.accent,
     fontVariant: ['tabular-nums'],
@@ -1304,29 +1681,12 @@ const styles = StyleSheet.create({
   cardCtaBtn: {
     width: '100%',
   },
-  swatchRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    marginTop: 2,
-  },
-  swatchItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
   swatchDot: {
     width: 10,
     height: 10,
     borderRadius: 99,
     borderWidth: 1,
     borderColor: colors.borderStrong,
-  },
-  swatchText: {
-    fontFamily: typography.sans,
-    fontSize: 11,
-    color: colors.muted,
   },
   loadMoreWrap: {
     alignItems: 'center',

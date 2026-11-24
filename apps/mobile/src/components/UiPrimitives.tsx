@@ -141,12 +141,14 @@ export function GarmentArtwork({
   height = 220,
   aspectRatio,
   hideCaption = false,
+  overrideToneHex,
 }: {
   uri?: string;
   altText: string;
   height?: number;
   aspectRatio?: number;
   hideCaption?: boolean;
+  overrideToneHex?: string;
 }): React.ReactElement {
   const [imgFailed, setImgFailed] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -156,7 +158,7 @@ export function GarmentArtwork({
     const [, rawTone = '%231E3A5F', rawSil = 'shirt', rawTitle = 'SỞI'] = uri.split('://')[1]
       ? ['', ...uri.split('://')[1].split('/')]
       : [];
-    const toneHex = decodeURIComponent(rawTone);
+    const toneHex = overrideToneHex || decodeURIComponent(rawTone);
     const silhouette = decodeURIComponent(rawSil);
     const title = decodeURIComponent(rawTitle);
     const isDark =

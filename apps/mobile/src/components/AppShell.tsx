@@ -91,10 +91,10 @@ export function AppShell(): React.ReactElement {
     }
   }, [cartCount, cartScale]);
 
-  /** Submit header search bar into CatalogScreen and navigate to storefront. */
+  /** Submit header search bar into Catalog Products view. */
   const handleHeaderSearch = () => {
     setCatalogSearchTrigger({ q: headerQuery.trim(), nonce: Date.now() });
-    navigate({ name: 'catalog' });
+    navigate({ name: 'catalog', view: 'products' });
   };
 
   const routeKey =
@@ -102,7 +102,9 @@ export function AppShell(): React.ReactElement {
       ? `product-${route.productId}`
       : route.name === 'order-detail'
         ? `order-${route.orderId}`
-        : route.name;
+        : route.name === 'catalog'
+          ? `catalog-${route.view ?? 'home'}`
+          : route.name;
 
   return (
     <SafeAreaView style={styles.root}>
@@ -200,7 +202,7 @@ export function AppShell(): React.ReactElement {
         {/* Tier 2: Amber Category Pill + Navigation Pills + Coral Quick-Buy CTA */}
         <View style={styles.tierTwo}>
           <Pressable
-            onPress={() => navigate({ name: 'catalog' })}
+            onPress={() => navigate({ name: 'catalog', view: 'products' })}
             style={styles.amberCategoryBtn}
             accessibilityRole="button"
           >
@@ -210,13 +212,16 @@ export function AppShell(): React.ReactElement {
           <View style={styles.navActions}>
             <NavTab
               label="Trang chủ"
-              active={route.name === 'catalog'}
-              onPress={() => navigate({ name: 'catalog' })}
+              active={route.name === 'catalog' && (route.view ?? 'home') === 'home'}
+              onPress={() => navigate({ name: 'catalog', view: 'home' })}
             />
             <NavTab
               label="Sản phẩm"
-              active={route.name === 'product'}
-              onPress={() => navigate({ name: 'catalog' })}
+              active={
+                (route.name === 'catalog' && route.view === 'products') ||
+                route.name === 'product'
+              }
+              onPress={() => navigate({ name: 'catalog', view: 'products' })}
             />
             {user?.role === 'CUSTOMER' ? (
               <NavTab
@@ -310,9 +315,17 @@ export function AppShell(): React.ReactElement {
       {/* Active route renderer */}
       <FadeSlideIn key={routeKey} distance={10} duration={260} style={styles.body}>
         {route.name === 'catalog' ? (
-          <CatalogScreen externalSearch={catalogSearchTrigger} />
+          <CatalogScreen
+            viewMode={route.view ?? 'home'}
+            externalSearch={catalogSearchTrigger}
+          />
         ) : null}
-        {route.name === 'product' ? <ProductDetailScreen productId={route.productId} /> : null}
+        {route.name === 'product' ? (
+          <ProductDetailScreen
+            productId={route.productId}
+            initialColor={route.initialColor}
+          />
+        ) : null}
         {route.name === 'auth' ? <AuthScreen initialMode={route.mode} /> : null}
         {route.name === 'profile' ? <ProfileScreen /> : null}
         {route.name === 'addresses' ? <AddressesScreen /> : null}

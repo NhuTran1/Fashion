@@ -332,3 +332,15 @@
   - `npm run typecheck --workspace apps/mobile` & `npm run typecheck --workspace apps/api`: PASS (0 errors).
   - `EXPO_NO_TELEMETRY=1 HOME=/tmp npx expo export --platform web --output-dir /tmp/fashion-web-dist`: PASS (294 modules, 756KB).
   - Playwright Chromium E2E Smoke Test (`1440x900`, `http://127.0.0.1:4179`): PASS (`PLAYWRIGHT E2E WEB SMOKE TEST PASSED (0 errors)`).
+
+
+## 2026-11-24 — Multi-color Card Swatches, Hover Actions, Quick View, Sản phẩm View & Vouchers (Nhánh feat/frontend-expo-mock)
+- Scope:
+  - Bổ sung chọn nhiều màu trực tiếp trên thẻ sản phẩm (`ProductPortraitCard`: chấm tròn màu có viền active, tự đổi màu áo và giá theo biến thể màu đang chọn).
+  - Thêm hiệu ứng hover hiện thanh 3 nút tròn (`⚙ Tùy chọn`, `👁 Xem nhanh`, `＋ Thêm nhanh giỏ`) và hộp thoại `QuickViewModal` ([QuickViewModal.tsx](apps/mobile/src/components/QuickViewModal.tsx)).
+  - Tách riêng tab `Trang chủ` (`home`) và tab `Sản phẩm` (`products` với banner `Tất cả sản phẩm`, breadcrumb `Trang chủ › Tất cả sản phẩm`, dải danh mục tròn và lưới sản phẩm).
+  - Bổ sung dải 4 thẻ Voucher (`VoucherStrip.tsx`: `HELLO`, `FREESHIP`, `SOI50K`, `SOI50` kèm nút `Sao chép` & xem điều kiện) và ô nhập kiểm tra mã P1 Preview ở Checkout.
+- Actual commands and results:
+  - `npm run typecheck --workspace apps/mobile` & `npm run typecheck --workspace apps/api`: PASS (0 errors).
+  - `EXPO_NO_TELEMETRY=1 HOME=/tmp npx expo export --platform web --output-dir /tmp/fashion-web-dist`: PASS (301 modules, 777KB).
+  - Playwright Chromium E2E Smoke Test (`1440x900`, `http://127.0.0.1:4180`): PASS (`PLAYWRIGHT E2E WEB SMOKE TEST PASSED (0 errors)`).

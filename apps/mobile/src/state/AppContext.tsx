@@ -16,8 +16,8 @@ import {
 
 /** Typed application routes supporting both Customer Storefront and Web-first Admin Ops. */
 export type AppRoute =
-  | { name: 'catalog' }
-  | { name: 'product'; productId: EntityId }
+  | { name: 'catalog'; view?: 'home' | 'products' }
+  | { name: 'product'; productId: EntityId; initialColor?: string }
   | { name: 'cart' }
   | { name: 'checkout' }
   | { name: 'order-success'; order: Order; replayed: boolean }

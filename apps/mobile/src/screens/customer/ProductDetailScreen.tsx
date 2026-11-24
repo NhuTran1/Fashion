@@ -21,7 +21,13 @@ import { ApiClientError, EntityId, Product, Review, Variant } from '../../types/
 import { formatDateTime, formatVnd } from '../../utils/format';
 
 /** Product detail screen with rounded gallery thumbnails, tactile pill selectors, and smooth reveals. */
-export function ProductDetailScreen({ productId }: { productId: EntityId }): React.ReactElement {
+export function ProductDetailScreen({
+  productId,
+  initialColor,
+}: {
+  productId: EntityId;
+  initialColor?: string;
+}): React.ReactElement {
   const { user, navigate, goBack, refreshCart, handleApiError, showToast } = useApp();
   const { width } = useWindowDimensions();
 
@@ -50,7 +56,12 @@ export function ProductDetailScreen({ productId }: { productId: EntityId }): Rea
     try {
       const data = await fashionApi.getProduct(productId);
       setProduct(data);
-      const firstAvailable = data.variants.find((v) => v.stockQuantity > 0) ?? data.variants[0];
+      const colorPreferred = initialColor
+        ? data.variants.find((v) => v.color === initialColor && v.stockQuantity > 0) ??
+          data.variants.find((v) => v.color === initialColor)
+        : undefined;
+      const firstAvailable =
+        colorPreferred ?? data.variants.find((v) => v.stockQuantity > 0) ?? data.variants[0];
       if (firstAvailable) {
         setSelectedSize(firstAvailable.size);
         setSelectedColor(firstAvailable.color);
@@ -64,7 +75,7 @@ export function ProductDetailScreen({ productId }: { productId: EntityId }): Rea
     } finally {
       setProductLoading(false);
     }
-  }, [handleApiError, productId]);
+  }, [handleApiError, initialColor, productId]);
 
   /** Load public VISIBLE reviews independently from product detail. */
   const loadReviews = useCallback(async () => {

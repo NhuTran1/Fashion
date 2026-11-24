@@ -12,6 +12,8 @@ import { useApp } from '../../state/AppContext';
 import { colors, radius, shadows, spacing, typography } from '../../theme/tokens';
 import { Address, ApiClientError, CheckoutInput, EntityId, Order, Product, Variant } from '../../types/api';
 import { createIdempotencyKey, formatDateTime, formatVnd } from '../../utils/format';
+import { DEMO_VOUCHERS } from '../../components/VoucherStrip';
+import { FieldInput } from '../../components/UiPrimitives';
 
 interface VariantMeta {
   product: Product;
@@ -238,6 +240,8 @@ export function CheckoutScreen(): React.ReactElement {
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [conflictLocked, setConflictLocked] = useState<boolean>(false);
+  const [voucherInput, setVoucherInput] = useState<string>('');
+  const [appliedVoucherNote, setAppliedVoucherNote] = useState<string | null>(null);
 
   /** Load latest server cart and Customer shipping addresses before checkout. */
   const loadCheckoutData = useCallback(async () => {
@@ -464,6 +468,36 @@ export function CheckoutScreen(): React.ReactElement {
             <Text style={styles.summaryValue}>{formatVnd(cart.subtotal)}</Text>
           </View>
           <Text style={styles.idemMeta}>Idempotency-Key: {idempotencyKey}</Text>
+
+          <View style={styles.divider} />
+          <FieldInput
+            label="Mã ưu đãi / Voucher (P1 Preview)"
+            value={voucherInput}
+            onChangeText={setVoucherInput}
+            autoCapitalize="characters"
+            placeholder="Nhập HELLO, FREESHIP, SOI50K hoặc SOI50..."
+          />
+          <View style={styles.rowBetween}>
+            <EditorialButton
+              label="Kiểm tra mã"
+              variant="secondary"
+              compact
+              onPress={() => {
+                const code = voucherInput.trim().toUpperCase();
+                const match = DEMO_VOUCHERS.find((v) => v.code === code);
+                if (match) {
+                  setAppliedVoucherNote(
+                    `Mã ${match.code}: ${match.description}. (Lưu ý: OpenAPI MVP A tính tổng server nguyên giá, voucher áp dụng từ P1-02).`,
+                  );
+                } else {
+                  setAppliedVoucherNote('Mã không hợp lệ. Thử HELLO, FREESHIP, SOI50K hoặc SOI50.');
+                }
+              }}
+            />
+            {appliedVoucherNote ? (
+              <Text style={[styles.summaryMuted, { flex: 1 }]}>{appliedVoucherNote}</Text>
+            ) : null}
+          </View>
         </View>
       </FadeSlideIn>
 
