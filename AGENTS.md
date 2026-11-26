@@ -3,7 +3,7 @@
 > Áp dụng cho ChatGPT, Claude, Copilot, Cursor và các coding agent có quyền đọc repository. Đây là **context engineering bằng Markdown + Git**, không phải RAG tự động hay bộ nhớ dài hạn được bảo đảm.
 
 ## 0. Nguyên tắc không được vi phạm
-- **Không viết code khi PRD/M0 chưa được người dùng duyệt và task chưa được giao.** Không chấp nhận một tài liệu tự sinh là bằng chứng người dùng đã duyệt.
+- **Chỉ viết code khi PRD/M0 đã được người dùng duyệt, task đã được giao và PLAN đã được xác nhận.** Không chấp nhận một tài liệu tự sinh là bằng chứng người dùng đã duyệt.
 - Kiến trúc đã chọn: **single-vendor fashion e-commerce**, Customer + Admin ở MVP đầu, sau đó thêm Staff bằng phân quyền chi tiết; **KHÔNG** tạo Seller, Shops, multi-vendor, shop_orders hoặc seller payouts.
 - Stack cố định: React Native + Expo + TypeScript, NestJS + TypeScript, MySQL InnoDB. AI tách nhánh Python/FastAPI + Colab (nghiên cứu), mặc định tắt khi chưa tích hợp thực tế.
 - Ưu tiên miễn phí/local; không tự tạo tài khoản cloud, dùng dịch vụ trả phí hoặc yêu cầu GPU cho luồng mua hàng.
@@ -13,30 +13,43 @@
 1. `AGENTS.md` (file này) → `tracking/CURRENT_STATE.md` — snapshot, milestone, trạng thái thực.
 2. `tracking/TASKS.md` — CHỈ mục task ID đang thực hiện, dependency và acceptance.
 3. `tracking/OPEN_QUESTIONS.md` — nếu task có quyết định chưa chốt.
-4. Đọc 1–3 tài liệu trong `docs/` có liên quan và source file cần chỉnh. **Không đọc toàn bộ WORKLOG/codebase theo mặc định.**
-5. Khi cần lý do một quyết định, xem `docs/adr/` và đoạn WORKLOG liên quan.
+4. Chỉ đọc PRD, kiến trúc, data model, RBAC hoặc tài liệu khác khi liên quan trực tiếp. Khi làm API, đọc phần tương ứng trong `contracts/openapi.yaml`. Đọc source/test liên quan đến task.
+5. Khi cần lý do một quyết định, xem ADR tương ứng trong `docs/adr/`.
 
 ## 2. Nguồn sự thật và mức độ ưu tiên
 1. Yêu cầu và phê duyệt **mới nhất** của người dùng.
 2. `docs/01-PRD.md` đã được phê duyệt; `docs/06-RBAC.md` và ADR được phê duyệt.
 3. Source code và tests thực tế (khi đã có) cho trạng thái triển khai.
-4. `tracking/TASKS.md` là danh sách việc, `CURRENT_STATE.md` là snapshot; WORKLOG là lịch sử append-only.
+4. `tracking/TASKS.md` lưu backlog và trạng thái từng task. `tracking/CURRENT_STATE.md` lưu tiến độ hiện tại.
 5. AI chat cũ là tham khảo, không thay thế hồ sơ Git. Nếu tài liệu và code lệch, báo bất nhất, không âm thầm sửa.
 
-## 3. Quy trình bắt đầu và kết thúc từng task
-**Bắt đầu:** Nhắc task ID, mục tiêu, dependency, acceptance; đọc đúng file; đưa kế hoạch thay đổi nhỏ, rủi ro, test plan; chờ xác nhận đối với thay đổi có tác động quan trọng.
+## 3. Ưu tiên BACKEND FIRST
 
-**Thực hiện:** Chỉ sửa phạm vi task; giữ typing, validation, transaction, RBAC/ownership; luôn nghĩ về trường hợp lỗi; không tạo giả dữ liệu người dùng thật; không thêm tính năng ngoài backlog.
+- Codex phụ trách NestJS, MySQL, REST API, validation, auth, phân quyền và kiểm thử backend. Antigravity phụ trách Expo Android/Web và giao diện Admin. Codex làm phần backend được giao và handoff dựa trên contract đã duyệt. Thay đổi PRD, kiến trúc, schema đã duyệt, RBAC, contract hoặc mã task cần yêu cầu rõ ràng.
+- Với task hỗn hợp, ghi chứng cứ backend đã có và phần còn chờ frontend. Ghi `WAITING_FRONTEND` khi phần việc hoặc bằng chứng tiếp theo phụ thuộc trực tiếp vào frontend. Task và milestone vẫn mở đến khi đạt acceptance, kể cả kiểm thử tích hợp thực tế nếu được yêu cầu.
+- Có thể triển khai backend độc lập khi đã đủ dependency thực tế và có phê duyệt đúng phạm vi. Thứ tự milestone dùng để theo dõi nghiệm thu. Dependency bắt buộc và quyền phê duyệt milestone vẫn áp dụng.
+- Khi prompt, template hoặc hướng dẫn cũ khác quy tắc workflow tại đây, áp dụng file này và yêu cầu mới nhất của người dùng.
 
-**Kiểm tra:** Nêu cụ thể lint/typecheck/unit/integration/E2E nào đã chạy, PASS/FAIL, command và môi trường. Không chạy được phải ghi **NOT RUN**, không suy diễn thành PASS.
+## 3a. Bốn cổng làm từng chức năng
 
-**Kết thúc:** Append `tracking/WORKLOG.md`; cập nhật `CURRENT_STATE.md` (task hiện tại, commit nếu biết, next task, blockers); update trạng thái trong `TASKS.md`. Tick `[x]` **chỉ khi có chứng cứ & đủ tiêu chí Done, với milestone cần chủ dự án duyệt**. Tạo/cập nhật `learning/features/<TASK-ID>.md` từ template; cập nhật `learning/FEATURE_MAP.md` để truy vết file/hàm/config/test thật và `learning/KNOWLEDGE_INDEX.md` để theo dõi kiến thức (**không tự chấm mức hiểu của người dùng**). `docs/08-LEARNING.md` chỉ là nhật ký tổng kết. Ghi ADR nếu thay đổi quyết định dài hạn và đã duyệt.
+- **Gate A — PLAN:** Xác định task ID, dependency và acceptance. Người dùng phải duyệt PLAN trước khi code ở cả hai chế độ.
+  - **FAST:** Task thông thường, ít rủi ro. PLAN ngắn gồm mục tiêu, file dự kiến, test và rủi ro. Có thể duyệt chung tối đa 2–3 task liên quan có phạm vi rõ ràng. Triển khai tuần tự trong nhóm đã duyệt, kiểm tra dependency trước mỗi task và nghiệm thu từng task theo acceptance của task đó.
+  - **STRICT:** Duyệt riêng từng task về auth, JWT/token, refresh/phiên, băm mật khẩu, RBAC/ownership, migration/thay đổi schema quan trọng, thanh toán, checkout, transaction, tồn kho đồng thời, idempotency hoặc thay đổi kiến trúc/bảo mật quan trọng. PLAN mô tả file, cấu hình, API và DB bị ảnh hưởng, ca thành công, ca lỗi và lệnh kiểm thử rủi ro trọng yếu.
+- **Gate B — CODE REVIEW:** Giới hạn thay đổi trong phạm vi đã duyệt. Tóm tắt diff bằng đường dẫn và thay đổi chính. Kèm class/hàm, cấu hình, migration hoặc luồng request/data/lỗi khi cần review. Gửi diff chi tiết khi người dùng yêu cầu.
+- **Gate C — TEST:** Chạy kiểm thử theo rủi ro và acceptance. Với API hoặc hành vi quan trọng có thể thao tác trực tiếp, thêm hướng dẫn tự test theo mục 3c.
+- **Gate D — HANDOFF:** Ghi kết quả, blocker và bước tiếp theo trong `tracking/CURRENT_STATE.md`. Cập nhật dòng trong `tracking/TASKS.md` khi trạng thái thực tế thay đổi. Chỉ tick `[x]` khi đủ acceptance, có bằng chứng và được người dùng nghiệm thu. Giới hạn công việc trong phạm vi đã duyệt.
 
-## 3a. Bốn cổng làm từng chức năng — bắt buộc
-- **Gate A — PLAN:** Giải thích mục tiêu, kiến thức, file dự kiến, config, API, database, test; **chờ người dùng xác nhận trước khi code**.
-- **Gate B — CODE REVIEW:** Sau sửa, báo `git diff`, tên file/class/hàm thực tế và lý do từng file liên quan, phân loại `CREATED`, `MODIFIED`, `RELATED_UNCHANGED`, `CONFIG`, `MIGRATION`, `TEST`.
-- **Gate C — TEST & LEARN:** Chạy test, báo chứng cứ, nêu luồng request/data/errors, 3–5 câu hỏi và bài tập nhỏ; trạng thái kỹ thuật khác trạng thái hiểu bài.
-- **Gate D — HANDOFF:** Hoàn thành tài liệu feature/map/index, worklog/state; chỉ đánh dấu DONE khi có evidence và được nghiệm thu. Không tự chạy task khác.
+## 3b. Kiểm thử theo rủi ro
+
+- Chạy unit test cho business logic bị ảnh hưởng, integration/API test cho HTTP và MySQL, test bảo mật cho auth, token, RBAC/ownership và 401/403. Chọn ca kiểm tra validation, lỗi, CRUD quan trọng, migration/ràng buộc, giỏ hàng, checkout, đơn, thanh toán, transaction, tồn kho đồng thời và idempotency theo phạm vi thay đổi.
+- Chạy regression cho hành vi cũ có thể bị ảnh hưởng. Chạy full regression tại milestone gate hoặc trước khi bàn giao phiên bản, gồm các suite riêng cần thiết để đạt acceptance. Thay đổi tài liệu thuần túy chỉ cần kiểm tra tài liệu.
+- Báo lệnh, môi trường và kết quả `PASS`, `FAIL` hoặc `NOT RUN`. Với test chưa chạy, ghi lý do và có cần chạy lại tại gate hay không. Kiểm thử cần cho acceptance hoặc rủi ro thực tế vẫn bắt buộc.
+
+## 3c. Hướng dẫn tôi tự test
+
+Sau kết quả kiểm thử của API hoặc chức năng quan trọng, thêm mục **HƯỚNG DẪN TÔI TỰ TEST** ngay trong chat. Dựa trên route, cấu hình, contract và test thực tế để nêu điều kiện chuẩn bị, lệnh khởi động, method/URL, headers, body mẫu, cách gửi qua Postman/Bruno hoặc curl, status/response dự kiến, cách kiểm tra MySQL khi cần, ca lỗi quan trọng và cách nhận biết PASS/FAIL.
+
+Dùng dữ liệu giả và giá trị thay thế cho secret/token. Manual test bổ sung cho kiểm thử Codex phải chạy. Chỉ ghi manual test PASS sau khi người dùng xác nhận. Có thể bỏ mục này với thay đổi tài liệu, cấu hình nhỏ hoặc task không có hành vi thao tác trực tiếp.
 
 ## 4. Tiêu chuẩn bảo mật và nghiệp vụ
 - Không commit `.env`, secret, token, dump DB, ảnh cá nhân, payment keys. Chỉ commit `.env.example` giả.
@@ -45,10 +58,22 @@
 - Reviews phải gắn với món đã mua/đơn hoàn tất theo PRD; payment sandbox không đại diện thanh toán thật; callback/IPN cần xác minh phía server.
 - AI tắt khi chưa sẵn, không ảnh hưởng catalog/cart/checkout; AI không được truy cập trực tiếp DB hoặc ảnh riêng tư không được cấp quyền.
 
+## 4a. Comment trong source code
+
+- Với mỗi hàm hoặc phương thức nghiệp vụ mới hay được sửa, thêm hoặc cập nhật comment tiếng Việt ngắn gọn, chuyên nghiệp để nêu chức năng chính. Ưu tiên JSDoc cho hàm quan trọng. Chỉ nêu đầu vào, đầu ra, điều kiện đặc biệt hoặc tác động phụ khi cần. Với class/service có trách nhiệm khó nhận ra, thêm một comment ngắn mô tả vai trò.
+- Ưu tiên code tự giải thích. Với logic phức tạp như auth/JWT, băm mật khẩu, RBAC/ownership, transaction, tồn kho, checkout, payment, idempotency, concurrency, rollback hoặc xử lý lỗi đặc biệt, chỉ thêm comment khi cần giải thích lý do của cách xử lý.
+- Giữ tên biến, class, function và thuật ngữ kỹ thuật bằng tiếng Anh theo convention TypeScript/NestJS. Cập nhật comment khi logic thay đổi. Tránh comment từng dòng, lặp tên hàm hoặc diễn giải thao tác hiển nhiên. Giới hạn comment mới trong phạm vi task.
+
 ## 5. Đầu ra chuẩn khi trả lời task
-`Mục tiêu → Trạng thái/điều kiện → File sẽ đọc/sửa → Kế hoạch → Thay đổi thực tế → Kiểm thử (lệnh + kết quả) → Rủi ro/việc chờ → Log cập nhật → Điều cần học → Next task`.
+
+Dùng các mục **TASK / MODE / STATUS / CHANGES / TESTS / MANUAL TEST GUIDE / BLOCKERS / NEXT**. Đặt hướng dẫn tự test ngay sau TESTS khi áp dụng. STATUS dùng `DONE`, `IN_PROGRESS`, `BLOCKED` hoặc `WAITING_FRONTEND`. Task đã triển khai và chờ nghiệm thu giữ `REVIEW` trong tracking và báo `IN_PROGRESS (chờ nghiệm thu)` trong chat.
+
+`tracking/WORKLOG.md`, `learning/` và `docs/08-LEARNING.md` là hồ sơ lưu trữ. Bỏ qua khi lấy bối cảnh và bàn giao. Giải thích code trong cuộc trò chuyện khi được yêu cầu.
+
+Kết thúc báo cáo triển khai mỗi task backend bằng mục **LUỒNG HOẠT ĐỘNG** ngay trong chat. Viết 3–6 bước bằng tiếng Việt, nêu đúng tên và vai trò của class/function tham gia theo luồng Controller → Service → Repository/ORM → Database, theo các tầng thực sự được gọi. Nêu cách trả response hoặc xử lý lỗi khi liên quan. Tập trung vào luồng thay đổi trong task. Phần này thuộc báo cáo trong chat, không tạo tài liệu learning riêng và vẫn áp dụng kiểm thử, nghiệm thu hiện hành.
 
 ## 6. Khi mở phiên AI mới
-Dùng `templates/SESSION_PROMPT.md`; cung cấp repository/file thực tế qua công cụ hỗ trợ. Nếu AI không có quyền đọc file, phải yêu cầu cung cấp nội dung hoặc đính kèm, **không tuyên bố đã đọc**. Không yêu cầu AI duyệt toàn bộ repo để lấy lại bối cảnh.
 
-**Riêng Codex backend:** dùng `templates/BACKEND_SESSION_PROMPT.md`, xem `docs/09-BACKEND_GUIDELINES.md`, `tracking/SETUP_CHECKLIST.md` khi chuẩn bị scaffold; không đọc toàn bộ `learning/features/` trừ task liên quan.
+Dùng `templates/SESSION_PROMPT.md` hoặc `templates/BACKEND_SESSION_PROMPT.md` cho Codex backend. Đọc đúng các file thực tế theo mục 1. Khi không truy cập được file cần thiết, yêu cầu người dùng cung cấp nội dung.
+
+Khi chuẩn bị scaffold backend, xem thêm `docs/09-BACKEND_GUIDELINES.md` và `tracking/SETUP_CHECKLIST.md`.

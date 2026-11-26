@@ -1,0 +1,2 @@
+# Prisma theo dõi provider của lịch sử migration.
+provider = "mysql"

@@ -22,6 +22,6 @@ Hoàn thành MVP A `Customer + Admin` trước; MVP B tách `Staff` qua quyền 
 ## Mỗi lần Codex code
 **Trước:** nêu task ID, acceptance, kiến thức, file dự kiến tạo/sửa, config/ORM/migration/test, rủi ro và chờ xác nhận.
 
-**Sau:** dùng Git và đọc file thật; phân loại CREATED / MODIFIED / RELATED_UNCHANGED / CONFIG / MIGRATION / TEST, truy vết request, ghi API/MySQL/exception/test; cập nhật `learning/features/<TASK-ID>.md`, `FEATURE_MAP.md`, `KNOWLEDGE_INDEX.md` (mức học do người dùng xác nhận). Ghi các câu hỏi phỏng vấn và một bài tập nhỏ.
+**Sau:** dùng Git và đọc file thật; phân loại CREATED / MODIFIED / RELATED_UNCHANGED / CONFIG / MIGRATION / TEST, truy vết request, ghi API/MySQL/exception/test. Giải thích code trực tiếp trong cuộc trò chuyện khi được yêu cầu.
 
-**Bàn giao:** `tracking/WORKLOG.md` + `CURRENT_STATE.md`; chỉ tick TASKS khi đủ acceptance và evidence. Không tự chuyển task hoặc tuyên bố đã triển khai.
+**Bàn giao:** tóm tắt kết quả kiểm tra và blocker hoặc bước tiếp theo trong `tracking/CURRENT_STATE.md`. Ghi trạng thái trong `tracking/TASKS.md` và chỉ tick DONE khi đủ tiêu chí, có bằng chứng và được nghiệm thu. Không tự chuyển task hoặc tuyên bố đã triển khai.

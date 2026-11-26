@@ -1,6 +1,6 @@
 {
   "openapi": "3.0.3",
-  "info": {"title":"Fashion Store MVP A API","version":"1.0.0","description":"Contract thiết kế đã nghiệm thu ở M1-08, chưa có backend chạy. Q03 giỏ Guest còn mở; API giỏ hiện dành cho Customer đăng nhập. Không gồm Staff, sandbox hoặc AI."},
+  "info": {"title":"Fashion Store MVP A API","version":"1.1.0","description":"Contract MVP A nghiệm thu ở M1-08 và bổ sung API ảnh theo M4-06. Q03 giỏ Guest còn mở; API giỏ hiện dành cho Customer đăng nhập. Không gồm Staff, sandbox hoặc AI."},
   "servers": [{"url":"/api/v1","description":"Web cùng origin; Android cấu hình HTTPS API origin khi triển khai."}],
   "paths": {
     "/auth/register": {
@@ -115,6 +115,85 @@
         "security": [],
         "parameters": [{"name":"productId","in":"path","required":true,"schema":{"type":"string","pattern":"^[1-9][0-9]*$"}}],
         "responses": {"200":{"description":"Thành công","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Product"}}}},"404":{"description":"NOT_FOUND","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"500":{"description":"INTERNAL_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}}}
+      }
+    },
+    "/products/{productId}/images/{imageId}/file": {
+      "get": {
+        "tags": [
+          "Catalog"
+        ],
+        "operationId": "readPublicProductImageFile",
+        "description": "Phục vụ ảnh gắn với sản phẩm hiển thị trong catalog công khai.",
+        "security": [],
+        "parameters": [
+          {
+            "name": "productId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]*$"
+            }
+          },
+          {
+            "name": "imageId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]*$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Nội dung ảnh",
+            "headers": {
+              "X-Content-Type-Options": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "nosniff"
+                  ]
+                }
+              }
+            },
+            "content": {
+              "image/jpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/png": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "INTERNAL_ERROR",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/products/{productId}/reviews": {
@@ -344,6 +423,249 @@
         "parameters": [{"name":"productId","in":"path","required":true,"schema":{"type":"string","pattern":"^[1-9][0-9]*$"}}],
         "requestBody": {"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/ImageInput"}}}},
         "responses": {"201":{"description":"Thành công","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Image"}}}},"400":{"description":"VALIDATION_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"401":{"description":"UNAUTHENTICATED / INVALID_CREDENTIALS","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"403":{"description":"FORBIDDEN / CSRF_INVALID","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"404":{"description":"NOT_FOUND","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"409":{"description":"RESOURCE_CONFLICT","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"500":{"description":"INTERNAL_ERROR","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}}}
+      }
+    },
+    "/admin/products/{productId}/images/upload": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "operationId": "uploadAdminProductImage",
+        "description": "Admin Web. Upload một JPEG/PNG tối đa 5 MiB và 16 megapixel, tên tối đa 255 byte, không chứa đường dẫn hoặc ký tự điều khiển. Server sinh storageKey và gắn ảnh vào sản phẩm.",
+        "security": [
+          {
+            "WebSession": [],
+            "WebCsrf": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "productId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]*$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "file"
+                ],
+                "properties": {
+                  "file": {
+                    "schema": {
+                      "type": "string",
+                      "format": "binary"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Ảnh đã được lưu và gắn vào sản phẩm",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Image"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_ERROR",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN / CSRF_INVALID",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "RESOURCE_CONFLICT",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "PAYLOAD_TOO_LARGE",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "UNSUPPORTED_MEDIA_TYPE",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "INTERNAL_ERROR",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/products/{productId}/images/{imageId}/file": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "operationId": "readAdminProductImageFile",
+        "description": "Admin Web. Xem trước ảnh gắn với sản phẩm, gồm sản phẩm chưa công khai.",
+        "security": [
+          {
+            "WebSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "productId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]*$"
+            }
+          },
+          {
+            "name": "imageId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]*$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Nội dung ảnh",
+            "headers": {
+              "X-Content-Type-Options": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "nosniff"
+                  ]
+                }
+              }
+            },
+            "content": {
+              "image/jpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/png": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN / CSRF_INVALID",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "INTERNAL_ERROR",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/admin/products/{productId}/images/{imageId}": {

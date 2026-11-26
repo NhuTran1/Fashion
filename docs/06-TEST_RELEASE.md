@@ -1,7 +1,7 @@
 # Test / Security / Release Plan v0.2 (chưa chạy)
 
 ## Điều kiện Done
-- Task có acceptance rõ ràng, test thực chạy hoặc lý do NOT RUN, review diff/secret, evidence ghi WORKLOG.
+- Task có acceptance rõ ràng, test thực chạy hoặc lý do NOT RUN, review diff/secret, tóm tắt kết quả kiểm tra trong `tracking/CURRENT_STATE.md`.
 - Milestone gate có demo + test log + user approval.
 - Không tự ghi PASS/benchmark khi chưa chạy.
 
@@ -84,6 +84,71 @@ Các ca trên là đặc tả và đang NOT RUN.
 - Mục tiêu khám phá API p95 catalog<500ms, cart<500ms, checkout<1000ms **không phải bảo đảm**.
 - Kiểm tra index bằng EXPLAIN, không thêm cache theo cảm giác.
 - Kiểm tra migration up trên DB disposable, backup→restore thực nghiệm, xử lý mất mạng và DB unavailable.
+
+### M4-09 — Baseline EXPLAIN catalog và lịch sử tồn
+
+Đo ngày 2026-11-24 trên Windows, Node v24.14.1, Prisma 7.10.1, MySQL 8.0.41 InnoDB tách biệt. MySQL Docker của workspace đang dừng. Instance đo chạy bốn migration hiện có, rồi cập nhật thống kê bằng `ANALYZE TABLE` trên dữ liệu giả.
+
+Quy mô đo từ MySQL gồm 24 danh mục (20 ACTIVE), 2.400 sản phẩm (2.058 ACTIVE), 9.600 biến thể (9.382 ACTIVE), 1.600 dòng metadata ảnh và 12.000 biến động tồn. Biến thể `1` có 1.200 biến động. Dữ liệu giả có bốn biến thể mỗi sản phẩm, tên chứa `Shirt` theo chu kỳ và timestamp cố định. Metadata ảnh chỉ dùng để đo SQL.
+
+Thu SQL và bind parameters từ Prisma driver khi gọi trực tiếp `CatalogService.listProducts()`, `CatalogService.getProduct()` và `InventoryService.listAdjustments()`. Chạy `EXPLAIN FORMAT=JSON` và `EXPLAIN ANALYZE` với cùng tham số cho 21 câu `SELECT` đã thu. Mỗi câu được đo một lần sau khi gọi service để thu SQL. Thời gian trong bảng là thời gian đến dòng cuối của iterator gốc MySQL, tính bằng ms.
+
+#### Truy vấn và tham số
+
+**Danh sách công khai** dùng hai câu dưới đây với cùng điều kiện danh mục, sản phẩm và biến thể `ACTIVE`. `NEWEST` dùng `ORDER BY p.created_at DESC, p.id DESC`. `PRICE_ASC` thêm `AND p.category_id = ? AND v.size = ? AND v.color = ?` và dùng `ORDER BY MIN(v.price) ASC, p.id ASC`. Ca tìm kiếm thêm `AND (LOCATE(?, p.name) > 0 OR LOCATE(?, p.slug) > 0)` và dùng thứ tự `NEWEST`.
+
+```sql
+SELECT COUNT(DISTINCT p.id) AS total
+FROM products p
+JOIN categories c ON c.id = p.category_id AND c.status = 'ACTIVE'
+JOIN product_variants v ON v.product_id = p.id AND v.status = 'ACTIVE'
+WHERE p.status = 'ACTIVE';
+
+SELECT p.id
+FROM products p
+JOIN categories c ON c.id = p.category_id AND c.status = 'ACTIVE'
+JOIN product_variants v ON v.product_id = p.id AND v.status = 'ACTIVE'
+WHERE p.status = 'ACTIVE'
+GROUP BY p.id, p.created_at
+ORDER BY p.created_at DESC, p.id DESC
+LIMIT ? OFFSET ?;
+```
+
+Ba ca đều dùng `LIMIT 20 OFFSET 0`. Tổng sản phẩm khớp đo được lần lượt là **1715** với `NEWEST`, **77** với danh mục `7` + size `M` + màu `Black`, và **343** khi tìm `Shirt`. Sau khi lấy ID trang, Prisma truy vấn `products.id IN (...)`, ảnh theo `product_id IN (...)` sắp `sort_order ASC, id ASC`, và biến thể `ACTIVE` theo `product_id IN (...)` sắp `id ASC`. Ca có lọc thêm cùng size/màu ở truy vấn biến thể.
+
+**Chi tiết sản phẩm ID `27`** lấy sản phẩm theo `products.id = ?`, nối danh mục và dùng `EXISTS` để yêu cầu biến thể `ACTIVE`, với `LIMIT 1 OFFSET 0`. Hai truy vấn quan hệ lấy biến thể `ACTIVE` theo `product_id` và ảnh theo `product_id`, theo thứ tự tương ứng ở trên. API service trả bốn biến thể và hai dòng ảnh.
+
+**Lịch sử tồn biến thể `1`** kiểm tra `product_variants.id = ?`, đếm `inventory_movements WHERE variant_id = ?`, rồi đọc cùng tập theo `ORDER BY created_at DESC, id DESC LIMIT 20 OFFSET 20`. Ca trang 2 trả 20 dòng trong tổng **1200**.
+
+#### Kết quả
+
+Cột index ghi `key` MySQL chọn, kèm `rows_examined_per_scan` ước lượng trong ngoặc. `ALL` là quét bảng. Hai cột cuối lấy từ iterator gốc của `EXPLAIN ANALYZE`. Dòng đếm trả một bản ghi chứa tổng.
+
+| Ca | Truy vấn | Bảng, index và ước lượng dòng mỗi lượt | Cờ EXPLAIN | Dòng thực tế | ms đến dòng cuối |
+|---|---|---|---|---:|---:|
+| NEWEST | Đếm sản phẩm | c: ALL (24)<br>p: `products_category_id_idx` (100)<br>v: `product_variants_product_id_idx` (3) | — | 1 | 35.5 |
+| NEWEST | ID của trang | c: ALL (24)<br>p: `products_category_id_idx` (100)<br>v: `product_variants_product_id_idx` (3) | filesort, bảng tạm | 20 | 49.9 |
+| NEWEST | Sản phẩm theo ID | products: `PRIMARY` (20) | — | 20 | 0.103 |
+| NEWEST | Metadata ảnh theo ID sản phẩm | product_images: `product_images_product_id_idx` (24) | filesort | 8 | 0.177 |
+| NEWEST | Biến thể ACTIVE theo ID sản phẩm | product_variants: `product_variants_product_id_idx` (80) | filesort | 79 | 0.56 |
+| PRICE_ASC có lọc | Đếm sản phẩm | c: `PRIMARY` (1)<br>p: `products_category_id_idx` (100)<br>v: `product_variants_product_id_idx` (3) | — | 1 | 1.88 |
+| PRICE_ASC có lọc | ID của trang theo `MIN(price)` | c: `PRIMARY` (1)<br>p: `products_category_id_idx` (100)<br>v: `product_variants_product_id_idx` (3) | filesort, bảng tạm | 20 | 2.27 |
+| PRICE_ASC có lọc | Sản phẩm theo ID | products: `PRIMARY` (20) | — | 20 | 0.0943 |
+| PRICE_ASC có lọc | Metadata ảnh theo ID sản phẩm | product_images: `product_images_product_id_idx` (20) | filesort | 0 | 0.0823 |
+| PRICE_ASC có lọc | Biến thể ACTIVE khớp size/màu | product_variants: `product_variants_product_id_idx` (80) | filesort | 20 | 0.48 |
+| Tìm `Shirt` | Đếm sản phẩm | c: ALL (24)<br>p: `products_category_id_idx` (100)<br>v: `product_variants_product_id_idx` (3) | — | 1 | 16.1 |
+| Tìm `Shirt` | ID của trang | c: ALL (24)<br>p: `products_category_id_idx` (100)<br>v: `product_variants_product_id_idx` (3) | filesort, bảng tạm | 20 | 17.1 |
+| Tìm `Shirt` | Sản phẩm theo ID | products: `PRIMARY` (20) | — | 20 | 0.0912 |
+| Tìm `Shirt` | Metadata ảnh theo ID sản phẩm | product_images: `product_images_product_id_idx` (25) | filesort | 10 | 0.108 |
+| Tìm `Shirt` | Biến thể ACTIVE theo ID sản phẩm | product_variants: `product_variants_product_id_idx` (80) | filesort | 79 | 0.305 |
+| Chi tiết | Sản phẩm và điều kiện công khai | products: `PRIMARY` (1)<br>j0: `PRIMARY` (1)<br>t1: `product_variants_product_id_idx` (4) | — | 1 | 0.0365 |
+| Chi tiết | Biến thể ACTIVE | product_variants: `product_variants_product_id_idx` (4) | — | 4 | 0.0424 |
+| Chi tiết | Metadata ảnh | product_images: `product_images_product_id_idx` (2) | filesort | 2 | 0.0545 |
+| Lịch sử tồn | Tìm biến thể | product_variants: `PRIMARY` (1) | — | 1 | 0.0011 |
+| Lịch sử tồn | Đếm biến động | inventory_movements: `inventory_movements_variant_id_created_at_id_idx` (1200) | — | 1 | 0.529 |
+| Lịch sử tồn | Trang biến động theo ngày/ID | inventory_movements: `inventory_movements_variant_id_created_at_id_idx` (1200, quét ngược) | — | 20 | 0.22 |
+
+Trên bộ dữ liệu này, cả ba truy vấn xếp hạng catalog đều dùng bảng tạm và filesort. `NEWEST` có thời gian lớn nhất trong các câu đo, **49.9 ms** ở truy vấn lấy ID trang. Lịch sử tồn trang 2 quét ngược index `inventory_movements_variant_id_created_at_id_idx` và trả 20 dòng trong **0.22 ms**. Đây là mốc SQL một lần chạy trên dữ liệu giả. Đo tải, p95 HTTP và Expo ở ngoài phạm vi lần đo này.
 
 ## Security / Privacy checklist
 - [ ] Password hash; token storage; no secret in logs/commits.

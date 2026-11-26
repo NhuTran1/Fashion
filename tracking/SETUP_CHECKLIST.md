@@ -13,13 +13,12 @@
 ## Môi trường local khi đã qua gate
 - [x] Git repository + `.gitignore` + README ở root. Danh sách stage M2-02 đã được rà mẫu secret.
 - [ ] Node.js LTS, npm/pnpm được kiểm tra phiên bản thật.
-- [ ] Docker Engine/Compose (hoặc MySQL local) chạy được.
+- [x] Docker Engine 27.5.1 và Compose 2.32.4 chạy MySQL 8.4.13 local. Start/restart và healthcheck PASS ở M2-04.
 - [ ] MySQL dev DB/user quyền tối thiểu; env local riêng; `.env.example` chỉ là placeholder.
 - [x] NestJS scaffold trong `apps/api/` theo M2-01. Build, typecheck và khởi động local trả HTTP 200.
-- [ ] DB kết nối; migration đầu tiên + rollback/backup policy đã test.
+- [ ] DB kết nối; migration đầu tiên + rollback/backup policy đã test. Migration đầu và kết nối Prisma Client đã PASS trên MySQL tạm ở M2-05. Kết nối NestJS và backup/restore còn mở.
 - [ ] Lint/typecheck/unit test smoke chạy thật và log kết quả.
 - [ ] OpenAPI route đầu tiên được chốt; tiêu chuẩn lỗi và status code nhất quán.
-- [ ] Tạo feature report đầu tiên sau khi code/test, không giả định đã hoàn thành.
 
 ## Handoff Stitch/Antigravity
 - [ ] Frontend đọc contract phiên bản được duyệt; mock và API thật phân biệt rõ.

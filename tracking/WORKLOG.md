@@ -281,3 +281,26 @@
 - PASS: kiểm tra ignore, giữ env ví dụ/lockfile trong phạm vi theo dõi và rà ứng viên theo mẫu secret bằng Python. Không in giá trị phát hiện. Kiểm thử ứng dụng NOT RUN.
 - Đã stage danh sách 63 file được rà. Kiểm tra lại 63 blob trong index không phát hiện mẫu secret. Cấu hình Codex và báo cáo Word để ngoài index. Chưa tạo commit.
 - M2-02 REVIEW. M2-01 vẫn chờ shell Expo.
+
+## 2026-11-20 — M2-03 — ESLint, Prettier và TypeScript cho API
+
+- Chủ dự án duyệt M2-03. Thêm ESLint flat config cho API, Prettier config và hai lệnh kiểm tra vào workspace. Giữ tsconfig strict với decorator metadata của NestJS.
+- Môi trường Windows, Node v24.14.1, npm 11.11.0, ESLint 10.15.0, typescript-eslint 8.73.0, Prettier 3.10.1 và TypeScript 5.9.3.
+- PASS: `npm run lint --workspace apps/api`, `npm run typecheck --workspace apps/api`, `npm run format:check --workspace apps/api`. Format check ban đầu báo riêng eslint.config.mjs. Đã định dạng file đó và chạy lại cả ba lệnh.
+- NOT RUN: unit, integration, E2E và kiểm tra Expo. Phạm vi M2-03 là cấu hình kiểm tra API. M2-03 REVIEW, chờ chủ dự án nghiệm thu. M2-02 vẫn REVIEW.
+
+## 2026-11-20 — M2-04 — MySQL InnoDB local bằng Docker Compose
+
+- Chủ dự án duyệt thực hiện M2-04. Thêm compose.yaml sử dụng MySQL 8.4.13, volume mysql_data và healthcheck SQL bằng tài khoản ứng dụng. Cổng 3306 của máy đã có dịch vụ lắng nghe, nên publish qua 127.0.0.1:3307. Cập nhật README và .env.example. Mật khẩu local ghi vào .env được Git bỏ qua.
+- Windows, Docker Engine 27.5.1 và Docker Compose v2.32.4-desktop.1. PASS: `docker compose config --quiet`, `docker compose up -d --wait --wait-timeout 150 mysql`, kiểm tra TCP cổng 3307 từ Windows.
+- PASS: `docker compose restart mysql`, sau đó `docker compose up -d --wait --wait-timeout 120 mysql` trả healthy. Cùng container có thời điểm khởi động mới. Truy vấn TCP trước/sau restart trả phiên bản 8.4.13, database fashioncommerce_dev, engine mặc định InnoDB và giá trị 1.
+- Truy vấn xác minh ban đầu gặp lỗi mã hóa PowerShell, làm lộ mật khẩu ứng dụng local trong đầu ra. Đã thay mật khẩu, đồng bộ .env và chạy lại kiểm tra. MySQL tiếp tục chạy local.
+- NOT RUN: kết nối từ NestJS, Prisma migration, unit, integration nghiệp vụ và E2E. M2-04 REVIEW, chờ nghiệm thu.
+
+## 2026-11-20 — M2-05 — Prisma schema và migration nền tảng
+
+- Chủ dự án duyệt M2-05. Initial schema có users, sessions, addresses, categories, products, product_variants, product_images và carts. Cart items để theo mốc giỏ hàng. Migration SQL versioned dùng InnoDB, sáu FK ON DELETE RESTRICT, các UNIQUE theo ERD và hai CHECK cho giá và tồn kho không âm.
+- Windows, Node v24.14.1, npm 11.11.0, TypeScript 5.9.3, Prisma CLI/Client/adapter MariaDB 7.10.1, MySQL 8.4.13. PASS: `npm run db:validate --workspace apps/api`, `npm run db:generate --workspace apps/api`, lint, format:check, typecheck và build.
+- PASS: `npm run db:migrate --workspace apps/api` và `npm run db:status --workspace apps/api` trên fashioncommerce_m205_test trong MySQL Docker tạm với cổng riêng. Chạy migrate lần hai hết migration chờ. Prisma migrate diff không thấy khác biệt giữa MySQL test và schema Prisma. Kiểm tra riêng MySQL xác nhận 8 bảng và bảng lịch sử Prisma đều InnoDB, 6 FK RESTRICT và 2 CHECK đang thực thi.
+- PASS: Prisma Client kiểm chứng BIGINT, DECIMAL đọc lại chính xác, MySQL từ chối SKU trùng, FK sai, tồn kho âm và giá âm. Bản kiểm tra đầu đã đọc sai vị trí mã lỗi adapter. Đã sửa phép kiểm tra và xác nhận toàn bộ PASS trên container trống mới.
+- Container thử nghiệm đã được dọn. Truy vấn lại fashioncommerce_dev trên cổng 3307 xác nhận 0 bảng. NOT RUN: kết nối từ NestJS, backup/restore và kiểm thử HTTP/checkout. M2-05 REVIEW, chờ nghiệm thu.

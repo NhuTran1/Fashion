@@ -1,6 +1,8 @@
 # API contract MVP A
 
-[OpenAPI 3.0.3](openapi.yaml) là contract v1.0.0 **APPROVED** để Codex và Antigravity đối chiếu. File dùng cú pháp JSON tương thích YAML để kiểm tra được bằng Python chuẩn. Endpoint vẫn ở mức thiết kế.
+[OpenAPI 3.0.3](openapi.yaml) v1.1.0 bổ sung upload và đọc ảnh đã duyệt ở M4-06 trên contract v1.0.0 của M1-08. File dùng cú pháp JSON tương thích YAML.
+
+- Admin upload một trường multipart `file` qua `POST /admin/products/{productId}/images/upload`. JPEG/PNG tối đa 5 MiB và 16 megapixel. Dùng `Image.url` trong response để hiển thị hoặc xem trước. Cấu hình `PRODUCT_IMAGE_DIR` trỏ tới kho file local.
 
 - Web đăng nhập qua `POST /auth/web/login`, nhận cookie phiên và CSRF token. Sau reload, gọi `GET /auth/csrf`. Gửi `X-CSRF-Token` trên các thao tác ghi có cookie. Customer Android dùng `POST /auth/login`, sau đó gửi opaque bearer token. Hết phiên thì đăng nhập lại.
 - ID là chuỗi số, tiền là chuỗi Decimal hai chữ số thập phân. Danh sách phân trang dùng `items/page/pageSize/total`. API công khai chỉ trả tài nguyên hiển thị theo chính sách.
@@ -20,4 +22,4 @@
 
 Antigravity phụ trách scaffold Expo TypeScript trong `apps/mobile`, đăng ký package trong npm workspace `apps/*` và khai báo script `start` để root chạy `npm run start --workspace apps/mobile`. Dùng cùng package manager và cập nhật `package-lock.json` tại root khi thêm dependency của app. Ghi riêng bằng chứng Expo/Metro khởi động và kết quả mở shell trên Android hoặc Web nếu đã thử.
 
-M2-01 chỉ yêu cầu shell khởi động. Kết nối API client là M2-08. Endpoint `GET /` của scaffold NestJS chỉ phục vụ smoke check local ở `http://127.0.0.1:3000/`. OpenAPI v1.0.0 tiếp tục là contract cho các route nghiệp vụ.
+M2-01 chỉ yêu cầu shell khởi động. Kết nối API client là M2-08. Để kiểm tra kết nối API, gọi `GET /api/v1/health` trên API origin của môi trường. Route công khai trả HTTP `200` với `{"status":"ok"}` khi tiến trình NestJS phản hồi. MySQL có healthcheck Docker riêng. OpenAPI v1.0.0 tiếp tục là contract cho các route nghiệp vụ.

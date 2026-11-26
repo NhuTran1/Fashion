@@ -6,18 +6,50 @@
     "build": "nest build",
     "start": "node dist/main.js",
     "start:dev": "nest start --watch",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "db:validate": "prisma validate",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate deploy",
+    "db:status": "prisma migrate status",
+    "db:seed": "npm run db:generate && npm run build && node dist/seed.js",
+    "test:prepare": "npm run db:generate && npm run build",
+    "test:unit": "npm run test:prepare && node --test test/config.unit.cjs test/user-role.unit.cjs",
+    "test:integration": "npm run test:prepare && node --test test/m2-07.http.cjs",
+    "test:e2e": "npm run test:prepare && node --test test/health.e2e.cjs",
+    "test:http": "npm run test:integration",
+    "test:auth": "npm run test:prepare && node --test test/auth.integration.cjs",
+    "test:catalog": "npm run test:prepare && node --test test/catalog.integration.cjs",
+    "test:admin-catalog": "npm run test:prepare && node --test test/admin-catalog.integration.cjs",
+    "test:inventory": "npm run test:prepare && node --test test/inventory.integration.cjs",
+    "test:product-images": "npm run test:prepare && node --test test/product-images.integration.cjs",
+    "test:cart": "npm run test:prepare && node --test test/cart.integration.cjs",
+    "test": "npm run test:prepare && node --test test/config.unit.cjs test/user-role.unit.cjs test/m2-07.http.cjs test/health.e2e.cjs",
+    "lint": "eslint src --max-warnings 0",
+    "format:check": "prettier --check \"src/**/*.ts\" \"!src/generated/prisma/**\" eslint.config.mjs .prettierrc.json prisma.config.ts package.json tsconfig.json nest-cli.json \"test/**/*.cjs\""
   },
   "dependencies": {
     "@nestjs/common": "^11.1.0",
     "@nestjs/core": "^11.1.0",
     "@nestjs/platform-express": "^11.1.0",
+    "@prisma/adapter-mariadb": "7.10.1",
+    "@prisma/client": "7.10.1",
+    "argon2": "0.45.2",
+    "class-transformer": "0.5.1",
+    "class-validator": "0.15.1",
+    "jpeg-js": "0.4.4",
+    "pngjs": "7.0.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@nestjs/cli": "^11.0.0",
     "@types/node": "^24.0.0",
-    "typescript": "~5.9.3"
+    "@types/pngjs": "6.0.5",
+    "eslint": "^10.15.0",
+    "prettier": "^3.10.1",
+    "prisma": "7.10.1",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.73.0"
   }
 }
