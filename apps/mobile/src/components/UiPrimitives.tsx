@@ -141,6 +141,8 @@ export function GarmentArtwork({
   height = 220,
   aspectRatio,
   hideCaption = false,
+  frameless = false,
+  sharpBottom = false,
   overrideToneHex,
 }: {
   uri?: string;
@@ -148,11 +150,16 @@ export function GarmentArtwork({
   height?: number;
   aspectRatio?: number;
   hideCaption?: boolean;
+  frameless?: boolean;
+  sharpBottom?: boolean;
   overrideToneHex?: string;
 }): React.ReactElement {
   const [imgFailed, setImgFailed] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const sizeStyle: ViewStyle = aspectRatio ? { aspectRatio } : { height };
+  const cornerStyle: ViewStyle | undefined = sharpBottom
+    ? { borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }
+    : undefined;
 
   if (uri && uri.startsWith('garment://')) {
     const [, rawTone = '%231E3A5F', rawSil = 'shirt', rawTitle = 'SỞI'] = uri.split('://')[1]
@@ -174,14 +181,25 @@ export function GarmentArtwork({
 
     return (
       <View
-        style={[styles.artContainer, sizeStyle, { backgroundColor: toneHex }]}
+        style={[
+          styles.artContainer,
+          frameless && styles.artContainerFrameless,
+          cornerStyle,
+          sizeStyle,
+          { backgroundColor: toneHex },
+        ]}
         accessibilityLabel={altText}
       >
         {/* Layered ambient textile sheen circles */}
         <View style={[styles.artGlowTop, { backgroundColor: orbTint }]} />
         <View style={[styles.artGlowBottom, { backgroundColor: orbTint }]} />
 
-        <View style={[styles.artInnerFrame, { borderColor: line }]}>
+        <View
+          style={[
+            styles.artInnerFrame,
+            frameless ? styles.artInnerFrameless : { borderColor: line },
+          ]}
+        >
           <GarmentSilhouette kind={silhouette} stroke={line} />
           {!hideCaption ? (
             <View style={styles.artCaptionPill}>
@@ -404,6 +422,9 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     position: 'relative',
   },
+  artContainerFrameless: {
+    padding: spacing.xs,
+  },
   artGlowTop: {
     position: 'absolute',
     width: 170,
@@ -428,6 +449,10 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     justifyContent: 'space-between',
     alignItems: 'center',
+  },
+  artInnerFrameless: {
+    borderWidth: 0,
+    padding: spacing.xs,
   },
   artCaptionPill: {
     paddingHorizontal: spacing.md,

@@ -183,24 +183,36 @@ export function ProductDetailScreen({
   }
 
   const isWide = width >= 840;
+  const isCompact = width < 640;
   const activeImage = product.images[activeImageIdx] ?? product.images[0];
   const outOfStock = !selectedVariant || selectedVariant.stockQuantity <= 0;
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={[styles.content, isCompact && styles.contentMobile]}
+    >
       <View style={styles.breadcrumbRow}>
         <EditorialButton label="Quay lại" variant="secondary" compact onPress={goBack} />
       </View>
 
       <FadeSlideIn distance={14}>
-        <View style={[styles.detailLayout, shadows.card, isWide && styles.detailLayoutWide]}>
+        <View
+          style={[
+            styles.detailLayout,
+            isCompact && styles.detailLayoutMobile,
+            shadows.card,
+            isWide && styles.detailLayoutWide,
+          ]}
+        >
           {/* Left column: Image gallery */}
           <View style={[styles.galleryCol, isWide && { width: 440, maxWidth: '46%' }]}>
             <View style={shadows.soft}>
               <GarmentArtwork
                 uri={activeImage?.url}
                 altText={activeImage?.altText || product.name}
-                aspectRatio={3 / 4}
+                aspectRatio={isWide ? 3 / 4 : undefined}
+                height={isWide ? undefined : 290}
               />
             </View>
             {product.images.length > 1 ? (
@@ -220,7 +232,9 @@ export function ProductDetailScreen({
 
           {/* Right column: Variant matrix, stock, CTA, honest AI feature flag notice */}
           <View style={[styles.infoCol, isWide && { flex: 1.1 }]}>
-            <Text style={styles.productTitle}>{product.name}</Text>
+            <Text style={[styles.productTitle, isCompact && styles.productTitleMobile]}>
+              {product.name}
+            </Text>
             <View style={styles.priceRow}>
               <Text style={styles.priceText}>
                 {selectedVariant ? formatVnd(selectedVariant.price) : 'Chọn biến thể'}
@@ -445,6 +459,11 @@ const styles = StyleSheet.create({
     gap: spacing.lg,
     paddingBottom: spacing.xxxl,
   },
+  contentMobile: {
+    padding: spacing.md,
+    gap: spacing.md,
+    paddingBottom: 72,
+  },
   breadcrumbRow: { flexDirection: 'row', alignItems: 'center' },
   detailLayout: {
     backgroundColor: colors.surface,
@@ -454,12 +473,16 @@ const styles = StyleSheet.create({
     padding: spacing.xl,
     gap: spacing.xl,
   },
+  detailLayoutMobile: {
+    padding: spacing.lg,
+    gap: spacing.md,
+  },
   detailLayoutWide: {
     flexDirection: 'row',
     alignItems: 'flex-start',
   },
   galleryCol: { gap: spacing.md },
-  thumbRow: { flexDirection: 'row', gap: spacing.sm },
+  thumbRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   thumbBox: {
     width: 76,
     borderWidth: 1.5,
@@ -474,6 +497,10 @@ const styles = StyleSheet.create({
     fontSize: 27,
     lineHeight: 34,
     color: colors.ink,
+  },
+  productTitleMobile: {
+    fontSize: 22,
+    lineHeight: 29,
   },
   priceRow: {
     flexDirection: 'row',

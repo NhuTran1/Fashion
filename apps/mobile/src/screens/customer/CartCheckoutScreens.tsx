@@ -143,7 +143,9 @@ export function CartScreen(): React.ReactElement {
                       <GarmentArtwork
                         uri={meta?.product.images[0]?.url}
                         altText={meta?.product.name || `Variant #${line.variantId}`}
-                        height={94}
+                        height={88}
+                        hideCaption
+                        frameless
                       />
                     </View>
                     <View style={styles.cartInfo}>
@@ -612,14 +614,14 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.canvas },
   pagePad: { padding: spacing.lg, maxWidth: 820, width: '100%', alignSelf: 'center' },
   content: {
-    padding: spacing.lg,
+    padding: spacing.md,
     maxWidth: 820,
     width: '100%',
     alignSelf: 'center',
-    gap: spacing.lg,
-    paddingBottom: spacing.xxxl,
+    gap: spacing.md,
+    paddingBottom: 76,
   },
-  title: { fontFamily: typography.serif, fontSize: 25, color: colors.ink },
+  title: { fontFamily: typography.serif, fontSize: 23, color: colors.ink },
   sectionHeading: { fontFamily: typography.sans, fontSize: 15, fontWeight: '700', color: colors.ink },
   list: { gap: spacing.md },
   cartRow: {
@@ -629,11 +631,12 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     padding: spacing.md,
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: spacing.md,
     alignItems: 'center',
   },
-  cartThumb: { width: 86 },
-  cartInfo: { flex: 1, gap: 4 },
+  cartThumb: { width: 76 },
+  cartInfo: { flex: 1, minWidth: 180, gap: 4 },
   itemName: { fontFamily: typography.sans, fontSize: 15, fontWeight: '600', color: colors.ink },
   itemMeta: { fontFamily: typography.sans, fontSize: 13, color: colors.muted },
   itemPrice: { fontFamily: typography.sans, fontSize: 13, color: colors.ink },
@@ -670,11 +673,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radius.lg,
-    padding: spacing.xl,
+    padding: spacing.lg,
     gap: spacing.sm,
   },
   rowBetween: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'space-between',
     alignItems: 'center',
     gap: spacing.sm,

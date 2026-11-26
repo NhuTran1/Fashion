@@ -62,6 +62,7 @@ export function CatalogScreen({
   const { width } = useWindowDimensions();
 
   const isDesktop = width >= 920;
+  const isCompact = width < 768;
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -102,6 +103,7 @@ export function CatalogScreen({
   }, [externalSearch]);
 
   const sidebarAnim = useRef(new Animated.Value(sidebarOpen ? 1 : 0)).current;
+  const drawerSlideAnim = useRef(new Animated.Value(340)).current;
   useEffect(() => {
     Animated.timing(sidebarAnim, {
       toValue: sidebarOpen ? 1 : 0,
@@ -109,7 +111,20 @@ export function CatalogScreen({
       easing: Easing.out(Easing.cubic),
       useNativeDriver: false,
     }).start();
-  }, [sidebarAnim, sidebarOpen]);
+    if (!isDesktop) {
+      if (sidebarOpen) {
+        drawerSlideAnim.setValue(320);
+        Animated.timing(drawerSlideAnim, {
+          toValue: 0,
+          duration: 260,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: USE_NATIVE_DRIVER,
+        }).start();
+      } else {
+        drawerSlideAnim.setValue(320);
+      }
+    }
+  }, [drawerSlideAnim, isDesktop, sidebarAnim, sidebarOpen]);
 
   /** Load ACTIVE categories and baseline active catalog for category counts & spotlight carousel. */
   const fetchCategoriesAndSpotlight = useCallback(async () => {
@@ -244,12 +259,20 @@ export function CatalogScreen({
       : width >= 1280
         ? 4
         : 3
-    : width >= 620
+    : width >= 340
       ? 2
       : 1;
 
   const cardWidthPercent: `${number}%` =
-    columns === 4 ? '23.8%' : columns === 3 ? '32.2%' : columns === 2 ? '48.8%' : '100%';
+    columns === 4
+      ? '23.8%'
+      : columns === 3
+        ? '32.2%'
+        : columns === 2
+          ? isCompact
+            ? '48.4%'
+            : '48.8%'
+          : '100%';
 
   const selectedCategoryName = categories.find((c) => c.id === selectedCategoryId)?.name;
 
@@ -402,12 +425,17 @@ export function CatalogScreen({
   return (
     <View style={[styles.pageRoot, isDesktop && styles.pageRootDesktop]}>
       {/* Left/Main Full-Screen Scrollable Storefront */}
-      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={[styles.content, isCompact && styles.contentMobile]}
+      >
         {viewMode === 'products' ? (
           /* Dedicated "Sản phẩm" Page Banner */
           <FadeSlideIn distance={12} duration={340}>
-            <View style={[styles.productsBanner, shadows.card]}>
-              <Text style={styles.productsBannerTitle}>
+            <View style={[styles.productsBanner, isCompact && styles.productsBannerMobile, shadows.card]}>
+              <Text
+                style={[styles.productsBannerTitle, isCompact && styles.productsBannerTitleMobile]}
+              >
                 {selectedCategoryName ? selectedCategoryName : 'Tất cả sản phẩm'}
               </Text>
               <View style={styles.breadcrumbBar}>
@@ -420,15 +448,21 @@ export function CatalogScreen({
                 </Text>
               </View>
 
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={{ width: '100%' }}
+                contentContainerStyle={styles.circleCatScrollContent}
+              >
                 <View style={styles.circleCatRow}>
                   <Pressable
                     onPress={() => setSelectedCategoryId(undefined)}
-                    style={styles.circleCatItem}
+                    style={[styles.circleCatItem, isCompact && styles.circleCatItemMobile]}
                   >
                     <View
                       style={[
                         styles.circleCatRing,
+                        isCompact && styles.circleCatRingMobile,
                         !selectedCategoryId && styles.circleCatRingActive,
                       ]}
                     >
@@ -444,13 +478,19 @@ export function CatalogScreen({
                       <Pressable
                         key={cat.id}
                         onPress={() => setSelectedCategoryId(active ? undefined : cat.id)}
-                        style={styles.circleCatItem}
+                        style={[styles.circleCatItem, isCompact && styles.circleCatItemMobile]}
                       >
-                        <View style={[styles.circleCatRing, active && styles.circleCatRingActive]}>
+                        <View
+                          style={[
+                            styles.circleCatRing,
+                            isCompact && styles.circleCatRingMobile,
+                            active && styles.circleCatRingActive,
+                          ]}
+                        >
                           <GarmentArtwork
                             uri={repImage}
                             altText={cat.name}
-                            height={72}
+                            height={isCompact ? 58 : 72}
                             hideCaption
                           />
                         </View>
@@ -468,24 +508,28 @@ export function CatalogScreen({
           /* "Trang chủ" Mint Promotional Hero Banner + Danh mục nổi bật carousel */
           <>
             <FadeSlideIn distance={14} duration={360}>
-              <View style={[styles.mintHero, shadows.card]}>
+              <View style={[styles.mintHero, isCompact && styles.mintHeroMobile, shadows.card]}>
                 <View style={styles.mintCircleBg} />
                 <View style={styles.mintHeroCopy}>
-                  <Text style={styles.mintHeroTitle}>
+                  <Text style={[styles.mintHeroTitle, isCompact && styles.mintHeroTitleMobile]}>
                     Thời Trang Tự Nhiên{'\n'}Chuẩn Phom Hàng Ngày
                   </Text>
-                  <Text style={styles.mintHeroSubtitle}>
+                  <Text
+                    style={[styles.mintHeroSubtitle, isCompact && styles.mintHeroSubtitleMobile]}
+                  >
                     Miễn phí giao hàng toàn quốc đơn COD mô phỏng. Chất liệu linen, cotton 260gsm và
                     len merino chọn lọc.
                   </Text>
                   <View style={styles.heroActions}>
                     <EditorialButton
                       label="ĐẶT NGAY"
+                      compact={isCompact}
                       onPress={() => navigate({ name: 'catalog', view: 'products' })}
                     />
                     <EditorialButton
                       label="Đơn hàng của tôi"
                       variant="secondary"
+                      compact={isCompact}
                       onPress={() => navigate({ name: 'orders' })}
                     />
                   </View>
@@ -551,20 +595,39 @@ export function CatalogScreen({
                           onPress={() => setSelectedCategoryId(active ? undefined : cat.id)}
                           style={[
                             styles.catSpotlightCard,
-                            shadows.soft,
+                            isCompact ? styles.catSpotlightCardMobile : shadows.soft,
                             active && styles.catSpotlightActive,
                           ]}
                         >
-                          <GarmentArtwork
-                            uri={repImage}
-                            altText={cat.name}
-                            height={110}
-                            hideCaption
-                          />
-                          <Text style={styles.catSpotlightTitle} numberOfLines={1}>
+                          <View
+                            style={
+                              isCompact
+                                ? [styles.catIconBoxMobile, active && styles.catIconBoxMobileActive]
+                                : undefined
+                            }
+                          >
+                            <GarmentArtwork
+                              uri={repImage}
+                              altText={cat.name}
+                              height={isCompact ? 62 : 110}
+                              hideCaption
+                              frameless={isCompact}
+                            />
+                          </View>
+                          <Text
+                            style={[
+                              styles.catSpotlightTitle,
+                              isCompact && styles.catSpotlightTitleMobile,
+                            ]}
+                            numberOfLines={2}
+                          >
                             {cat.name}
                           </Text>
-                          <Text style={styles.catSpotlightCount}>{catProducts.length} sản phẩm</Text>
+                          {!isCompact ? (
+                            <Text style={styles.catSpotlightCount}>
+                              {catProducts.length} sản phẩm
+                            </Text>
+                          ) : null}
                         </Pressable>
                       );
                     })}
@@ -580,45 +643,69 @@ export function CatalogScreen({
 
         {/* "Bán chạy nhất hàng ngày" Interactive Horizontal Carousel across all active models */}
         {viewMode === 'home' && allActiveProducts.length > 0 && activeFilterCount === 0 ? (
-          <View style={[styles.bestSellerPanel, shadows.card]}>
-            <View style={styles.bestSellerPromo}>
-              <Text style={styles.promoHeadline}>Bán chạy nhất hàng ngày</Text>
-              <Text style={styles.promoSub}>
-                Ưu đãi độc quyền - Giá tốt từ 290.000₫. Lướt xem {allActiveProducts.length} mẫu thiết
-                kế nổi bật.
-              </Text>
-              <Pressable
-                onPress={() => navigate({ name: 'catalog', view: 'products' })}
-                style={styles.promoWhiteBtn}
-              >
-                <Text style={styles.promoWhiteBtnText}>Xem tất cả</Text>
-              </Pressable>
-            </View>
-
-            <View style={styles.bestSellerCarouselCol}>
-              <View style={styles.bestSellerNavRow}>
-                <Text style={styles.bestSellerNavHint}>
-                  Lướt qua các mẫu ({allActiveProducts.length} sản phẩm)
-                </Text>
-                <View style={styles.arrowGroup}>
-                  <Pressable
-                    onPress={() => scrollHorizontal(bestScrollRef, bestScrollX, -320)}
-                    style={styles.arrowBtn}
-                    accessibilityRole="button"
-                    accessibilityLabel="Mẫu bán chạy trước"
-                  >
-                    <Text style={styles.arrowText}>‹</Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={() => scrollHorizontal(bestScrollRef, bestScrollX, 320)}
-                    style={styles.arrowBtn}
-                    accessibilityRole="button"
-                    accessibilityLabel="Mẫu bán chạy tiếp theo"
-                  >
-                    <Text style={styles.arrowText}>›</Text>
-                  </Pressable>
+          <View
+            style={[
+              styles.bestSellerPanel,
+              isCompact ? styles.bestSellerPanelMobile : shadows.card,
+            ]}
+          >
+            {isCompact ? (
+              <View style={styles.bestSellerHeaderCompact}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.sectionHeading}>Bán chạy nhất hàng ngày</Text>
+                  <Text style={styles.bestSellerNavHint}>Ưu đãi từ 290.000₫ · Lướt xem mẫu</Text>
                 </View>
+                <Pressable onPress={() => navigate({ name: 'catalog', view: 'products' })}>
+                  <Text style={styles.sectionLink}>Xem tất cả ›</Text>
+                </Pressable>
               </View>
+            ) : (
+              <View style={styles.bestSellerPromo}>
+                <Text style={styles.promoHeadline}>Bán chạy nhất hàng ngày</Text>
+                <Text style={styles.promoSub}>
+                  Ưu đãi độc quyền - Giá tốt từ 290.000₫. Lướt xem {allActiveProducts.length} mẫu
+                  thiết kế nổi bật.
+                </Text>
+                <Pressable
+                  onPress={() => navigate({ name: 'catalog', view: 'products' })}
+                  style={styles.promoWhiteBtn}
+                >
+                  <Text style={styles.promoWhiteBtnText}>Xem tất cả</Text>
+                </Pressable>
+              </View>
+            )}
+
+            <View
+              style={[
+                styles.bestSellerCarouselCol,
+                isCompact && styles.bestSellerCarouselColMobile,
+              ]}
+            >
+              {!isCompact ? (
+                <View style={styles.bestSellerNavRow}>
+                  <Text style={styles.bestSellerNavHint}>
+                    Lướt qua các mẫu ({allActiveProducts.length} sản phẩm)
+                  </Text>
+                  <View style={styles.arrowGroup}>
+                    <Pressable
+                      onPress={() => scrollHorizontal(bestScrollRef, bestScrollX, -320)}
+                      style={styles.arrowBtn}
+                      accessibilityRole="button"
+                      accessibilityLabel="Mẫu bán chạy trước"
+                    >
+                      <Text style={styles.arrowText}>‹</Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={() => scrollHorizontal(bestScrollRef, bestScrollX, 320)}
+                      style={styles.arrowBtn}
+                      accessibilityRole="button"
+                      accessibilityLabel="Mẫu bán chạy tiếp theo"
+                    >
+                      <Text style={styles.arrowText}>›</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              ) : null}
 
               <ScrollView
                 ref={bestScrollRef}
@@ -634,7 +721,10 @@ export function CatalogScreen({
                     <ProductPortraitCard
                       key={`best-${prod.id}`}
                       product={prod}
-                      cardStyle={styles.carouselItemCard}
+                      compactCard={isCompact}
+                      cardStyle={
+                        isCompact ? styles.carouselItemCardMobile : styles.carouselItemCard
+                      }
                       badgeText="Bán chạy"
                       badgeColor={colors.amber}
                       badgeTextColor={colors.amberInk}
@@ -652,13 +742,15 @@ export function CatalogScreen({
           </View>
         ) : null}
 
-        {/* "TẤT CẢ SẢN PHẨM" Toolbar & Active Filters */}
-        <View style={[styles.toolbarCard, shadows.soft]}>
+        {/* "TẤT CẢ SẢN PHẨM" Airy Header + Inline Shopee-style Sort/Filter Strip */}
+        <View style={[styles.toolbarCard, isCompact ? styles.toolbarCardMobile : shadows.soft]}>
           <View style={styles.toolbarTop}>
             <View style={styles.toolbarMeta}>
-              <Text style={styles.allProductsTitle}>TẤT CẢ SẢN PHẨM</Text>
+              <Text style={[styles.allProductsTitle, isCompact && styles.allProductsTitleMobile]}>
+                Gợi ý hôm nay
+              </Text>
               <Text style={styles.resultCount}>
-                {loading ? 'Đang tải...' : `${total} sản phẩm đang mở bán`}
+                {loading ? 'Đang tải...' : `${total} sản phẩm`}
               </Text>
             </View>
 
@@ -670,12 +762,27 @@ export function CatalogScreen({
                 accessibilityLabel={sidebarOpen ? 'Ẩn thanh tìm kiếm' : 'Mở thanh tìm kiếm'}
               >
                 <Text style={styles.toggleSidebarText}>
-                  {sidebarOpen ? 'Ẩn bộ lọc' : 'Tìm kiếm & Lọc'}
+                  {sidebarOpen ? 'Ẩn bộ lọc' : '⚙ Bộ lọc'}
                   {!sidebarOpen && activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
                 </Text>
               </Pressable>
             </View>
           </View>
+
+          {isCompact ? (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View style={styles.mobileSortStrip}>
+                {SORT_OPTIONS.map((opt) => (
+                  <FilterChip
+                    key={opt.value}
+                    label={opt.label}
+                    active={sort === opt.value}
+                    onPress={() => setSort(opt.value)}
+                  />
+                ))}
+              </View>
+            </ScrollView>
+          ) : null}
 
           {activeFilterCount > 0 ? (
             <View style={styles.activeFilterRow}>
@@ -758,7 +865,7 @@ export function CatalogScreen({
               />
             ) : null}
 
-            <View style={styles.grid}>
+            <View style={[styles.grid, isCompact && styles.gridMobile]}>
               {products.map((product, idx) => {
                 const totalStock = getTotalActiveStock(product);
                 const badgeText =
@@ -776,6 +883,7 @@ export function CatalogScreen({
                   >
                     <ProductPortraitCard
                       product={product}
+                      compactCard={isCompact}
                       cardStyle={{ width: '100%' }}
                       badgeText={badgeText}
                       badgeColor={colors.coralRed}
@@ -834,8 +942,8 @@ export function CatalogScreen({
         </Animated.View>
       ) : null}
 
-      {/* Floating Right-Edge Handle Tab when Sidebar is Collapsed — instant reopen from anywhere */}
-      {!sidebarOpen ? (
+      {/* Floating Right-Edge Handle Tab on Desktop only (Mobile uses clean inline filter pill without blocking products) */}
+      {!sidebarOpen && isDesktop ? (
         <Pressable
           onPress={() => setSidebarOpen(true)}
           style={[styles.edgeReopenHandle, shadows.lifted]}
@@ -852,7 +960,7 @@ export function CatalogScreen({
         </Pressable>
       ) : null}
 
-      {/* Mobile/Tablet Right Slide-Over Drawer Modal */}
+      {/* Mobile/Tablet Smooth Slide-Over Drawer Modal */}
       {!isDesktop ? (
         <Modal
           visible={sidebarOpen}
@@ -862,11 +970,17 @@ export function CatalogScreen({
         >
           <View style={styles.drawerOverlay}>
             <Pressable style={styles.drawerBackdrop} onPress={() => setSidebarOpen(false)} />
-            <FadeSlideIn distance={20} duration={240} style={[styles.mobileDrawer, shadows.lifted]}>
+            <Animated.View
+              style={[
+                styles.mobileDrawer,
+                shadows.lifted,
+                { transform: [{ translateX: drawerSlideAnim }] },
+              ]}
+            >
               <ScrollView showsVerticalScrollIndicator={false}>
                 {renderFilterSidebarContent()}
               </ScrollView>
-            </FadeSlideIn>
+            </Animated.View>
           </View>
         </Modal>
       ) : null}
@@ -893,6 +1007,7 @@ export function CatalogScreen({
  */
 function ProductPortraitCard({
   product,
+  compactCard = false,
   cardStyle,
   badgeText,
   badgeColor,
@@ -903,6 +1018,7 @@ function ProductPortraitCard({
   onQuickAdd,
 }: {
   product: Product;
+  compactCard?: boolean;
   cardStyle?: object;
   badgeText?: string;
   badgeColor: string;
@@ -935,7 +1051,7 @@ function ProductPortraitCard({
 
   return (
     <View
-      style={[styles.cardWrap, shadows.soft, cardStyle]}
+      style={[styles.cardWrap, compactCard && styles.cardWrapCompact, shadows.soft, cardStyle]}
       {...(Platform.OS === 'web'
         ? {
             onMouseEnter: () => setHovered(true),
@@ -954,83 +1070,115 @@ function ProductPortraitCard({
               uri={product.images[0]?.url}
               altText={product.images[0]?.altText || product.name}
               aspectRatio={3 / 4}
+              hideCaption={compactCard}
+              frameless={compactCard}
+              sharpBottom={compactCard}
               overrideToneHex={selectedColor ? resolveColorSwatch(selectedColor) : undefined}
             />
             {badgeText ? (
               <View style={[styles.cardBadge, { backgroundColor: badgeColor }]}>
                 <Text style={[styles.cardBadgeText, { color: badgeTextColor }]}>{badgeText}</Text>
               </View>
-            ) : null}
+            ) : !compactCard ? null : (
+              <View style={styles.freeshipMiniTag}>
+                <Text style={styles.freeshipText}>FREESHIP</Text>
+              </View>
+            )}
 
-            <View style={styles.freeshipPill}>
-              <Text style={styles.freeshipText}>FREESHIP</Text>
-            </View>
+            {!compactCard ? (
+              <View style={styles.freeshipPill}>
+                <Text style={styles.freeshipText}>FREESHIP</Text>
+              </View>
+            ) : null}
           </View>
         </InteractiveCard>
 
-        {/* Centered Large Hover Action Toolbar anchored directly inside garment frame */}
-        <Animated.View
-          pointerEvents={hovered ? 'auto' : 'none'}
-          style={[
-            styles.hoverToolbar,
-            {
-              opacity: hoverAnim,
-              transform: [
-                {
-                  scale: hoverAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [0.9, 1],
-                  }),
-                },
-              ],
-            },
-          ]}
-        >
-          <HoverActionCircle
-            icon="⚙"
-            label={`Tùy chọn ${product.name}`}
-            onPress={() => onOpenDetail(selectedColor)}
-          />
-          <HoverActionCircle
-            icon="👁"
-            label={`Xem nhanh ${product.name}`}
+        {/* Touch-friendly corner Quick View button visible on mobile & native */}
+        {compactCard || Platform.OS !== 'web' ? (
+          <Pressable
             onPress={() => onQuickView(selectedColor)}
-          />
-          <HoverActionCircle
-            icon="＋"
-            accent
-            label={`Thêm nhanh ${product.name}`}
-            onPress={() => onQuickAdd(selectedColor)}
-          />
-        </Animated.View>
+            style={styles.touchQuickViewBtn}
+            accessibilityRole="button"
+            accessibilityLabel={`Xem nhanh ${product.name}`}
+          >
+            <Text style={styles.touchQuickViewIcon}>👁</Text>
+          </Pressable>
+        ) : null}
+
+        {/* Centered Large Hover Action Toolbar anchored directly inside garment frame (Desktop Web) */}
+        {!compactCard ? (
+          <Animated.View
+            pointerEvents={hovered ? 'auto' : 'none'}
+            style={[
+              styles.hoverToolbar,
+              {
+                opacity: hoverAnim,
+                transform: [
+                  {
+                    scale: hoverAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0.9, 1],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          >
+            <HoverActionCircle
+              icon="⚙"
+              label={`Tùy chọn ${product.name}`}
+              onPress={() => onOpenDetail(selectedColor)}
+            />
+            <HoverActionCircle
+              icon="👁"
+              label={`Xem nhanh ${product.name}`}
+              onPress={() => onQuickView(selectedColor)}
+            />
+            <HoverActionCircle
+              icon="＋"
+              accent
+              label={`Thêm nhanh ${product.name}`}
+              onPress={() => onQuickAdd(selectedColor)}
+            />
+          </Animated.View>
+        ) : null}
       </View>
 
-      {/* Product meta, interactive circular multi-color swatches, price, and emerald pill CTA */}
-      <View style={styles.cardBody}>
+      {/* Product meta, interactive multi-color swatches, price & quick-add action */}
+      <View style={[styles.cardBody, compactCard && styles.cardBodyCompact]}>
         <Pressable onPress={() => onOpenDetail(selectedColor)}>
-          <Text style={styles.cardTitle} numberOfLines={2}>
+          <Text
+            style={[styles.cardTitle, compactCard && styles.cardTitleCompact]}
+            numberOfLines={2}
+          >
             {product.name}
           </Text>
         </Pressable>
 
-        <View style={styles.cardSubMetaRow}>
-          <Text style={styles.cardSizeSummary}>
-            Size {uniqueSizes[0]}–{uniqueSizes[uniqueSizes.length - 1]} ({uniqueSizes.length} size)
-          </Text>
-          <Text style={styles.cardStockMini}>
-            {totalStock > 0 ? `Còn ${totalStock}` : 'Hết hàng'}
-          </Text>
-        </View>
+        {!compactCard ? (
+          <View style={styles.cardSubMetaRow}>
+            <Text style={styles.cardSizeSummary} numberOfLines={1}>
+              Size {uniqueSizes[0]}–{uniqueSizes[uniqueSizes.length - 1]}
+            </Text>
+            <Text style={styles.cardStockMini}>
+              {totalStock > 0 ? `Còn ${totalStock}` : 'Hết'}
+            </Text>
+          </View>
+        ) : null}
 
         <View style={styles.swatchCircleRow}>
-          {uniqueColors.slice(0, 4).map((clr) => {
+          {uniqueColors.slice(0, compactCard ? 3 : 4).map((clr) => {
             const active = selectedColor === clr;
             return (
               <Pressable
                 key={clr}
                 onPress={() => setSelectedColor(clr)}
                 onHoverIn={() => setSelectedColor(clr)}
-                style={[styles.swatchCircleOuter, active && styles.swatchCircleOuterActive]}
+                style={[
+                  styles.swatchCircleOuter,
+                  compactCard && styles.swatchCircleOuterCompact,
+                  active && styles.swatchCircleOuterActive,
+                ]}
                 accessibilityLabel={`Màu ${clr}`}
               >
                 <View
@@ -1039,22 +1187,49 @@ function ProductPortraitCard({
               </Pressable>
             );
           })}
-          {uniqueColors.length > 4 ? (
-            <Text style={styles.moreColorText}>+{uniqueColors.length - 4}</Text>
+          {uniqueColors.length > (compactCard ? 3 : 4) ? (
+            <Text style={styles.moreColorText}>+{uniqueColors.length - (compactCard ? 3 : 4)}</Text>
           ) : null}
-          {selectedColor ? <Text style={styles.selectedColorName}>{selectedColor}</Text> : null}
+          {!compactCard && selectedColor ? (
+            <Text style={styles.selectedColorName}>{selectedColor}</Text>
+          ) : null}
         </View>
 
-        <Text style={styles.cardPrice}>{formatVnd(displayPrice)}</Text>
+        {compactCard ? (
+          <View style={styles.mobilePriceRow}>
+            <Text style={[styles.cardPrice, styles.cardPriceCompact]}>
+              {formatVnd(displayPrice)}
+            </Text>
+            <Pressable
+              onPress={() =>
+                totalStock > 0 ? onQuickAdd(selectedColor) : onOpenDetail(selectedColor)
+              }
+              disabled={busy}
+              style={[
+                styles.mobilePlusAddBtn,
+                totalStock === 0 && styles.mobilePlusAddDisabled,
+                busy && { opacity: 0.5 },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel={`Thêm ${product.name} vào giỏ`}
+            >
+              <Text style={styles.mobilePlusAddText}>{totalStock > 0 ? '＋' : '›'}</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <Text style={styles.cardPrice}>{formatVnd(displayPrice)}</Text>
+        )}
       </View>
 
-      <EditorialButton
-        label={totalStock > 0 ? 'Thêm vào giỏ' : 'Xem chi tiết'}
-        onPress={() => (totalStock > 0 ? onQuickAdd(selectedColor) : onOpenDetail(selectedColor))}
-        loading={busy}
-        compact
-        style={styles.cardCtaBtn}
-      />
+      {!compactCard ? (
+        <EditorialButton
+          label={totalStock > 0 ? 'Thêm vào giỏ' : 'Xem chi tiết'}
+          onPress={() => (totalStock > 0 ? onQuickAdd(selectedColor) : onOpenDetail(selectedColor))}
+          loading={busy}
+          compact
+          style={styles.cardCtaBtn}
+        />
+      ) : null}
     </View>
   );
 }
@@ -1175,6 +1350,12 @@ const styles = StyleSheet.create({
     gap: spacing.xl,
     paddingBottom: spacing.xxxl,
   },
+  contentMobile: {
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.md,
+    gap: spacing.lg,
+    paddingBottom: spacing.xxl,
+  },
   productsBanner: {
     backgroundColor: '#163D29',
     borderRadius: radius.lg,
@@ -1182,11 +1363,18 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     alignItems: 'center',
   },
+  productsBannerMobile: {
+    padding: spacing.lg,
+    gap: spacing.sm,
+  },
   productsBannerTitle: {
     fontFamily: typography.serif,
     fontSize: 28,
     fontWeight: '800',
     color: '#FFFFFF',
+  },
+  productsBannerTitleMobile: {
+    fontSize: 22,
   },
   breadcrumbBar: {
     flexDirection: 'row',
@@ -1209,6 +1397,9 @@ const styles = StyleSheet.create({
     color: colors.amber,
     fontWeight: '700',
   },
+  circleCatScrollContent: {
+    paddingHorizontal: spacing.xs,
+  },
   circleCatRow: {
     flexDirection: 'row',
     gap: spacing.lg,
@@ -1218,6 +1409,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
     width: 96,
+  },
+  circleCatItemMobile: {
+    width: 78,
   },
   circleCatRing: {
     width: 78,
@@ -1230,6 +1424,10 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: 'transparent',
     padding: 3,
+  },
+  circleCatRingMobile: {
+    width: 62,
+    height: 62,
   },
   circleCatRingActive: {
     borderColor: colors.amber,
@@ -1257,6 +1455,10 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     position: 'relative',
   },
+  mintHeroMobile: {
+    padding: spacing.lg,
+    gap: spacing.md,
+  },
   mintCircleBg: {
     position: 'absolute',
     width: 420,
@@ -1283,12 +1485,20 @@ const styles = StyleSheet.create({
     lineHeight: 42,
     color: colors.ink,
   },
+  mintHeroTitleMobile: {
+    fontSize: 24,
+    lineHeight: 31,
+  },
   mintHeroSubtitle: {
     fontFamily: typography.sans,
     fontSize: 15,
     lineHeight: 22,
     color: '#3E4C46',
     maxWidth: 620,
+  },
+  mintHeroSubtitleMobile: {
+    fontSize: 13.5,
+    lineHeight: 20,
   },
   heroActions: {
     flexDirection: 'row',
@@ -1357,6 +1567,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
   },
+  catSpotlightCardMobile: {
+    width: 82,
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+    padding: 0,
+    gap: 6,
+  },
+  catIconBoxMobile: {
+    width: 64,
+    height: 64,
+    borderRadius: radius.md,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#ECEEEB',
+  },
+  catIconBoxMobileActive: {
+    borderColor: colors.accent,
+    borderWidth: 2,
+  },
   catSpotlightActive: {
     borderColor: colors.accent,
     backgroundColor: colors.accentSoft,
@@ -1366,6 +1595,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     color: colors.ink,
+  },
+  catSpotlightTitleMobile: {
+    fontSize: 11.5,
+    fontWeight: '600',
+    textAlign: 'center',
+    lineHeight: 15,
   },
   catSpotlightCount: {
     fontFamily: typography.sans,
@@ -1383,6 +1618,19 @@ const styles = StyleSheet.create({
     gap: spacing.lg,
     alignItems: 'stretch',
   },
+  bestSellerPanelMobile: {
+    flexDirection: 'column',
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+    padding: 0,
+    gap: spacing.sm,
+  },
+  bestSellerHeaderCompact: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+  },
   bestSellerPromo: {
     width: 240,
     flexGrow: 1,
@@ -1391,6 +1639,12 @@ const styles = StyleSheet.create({
     padding: spacing.xl,
     justifyContent: 'space-between',
     gap: spacing.md,
+  },
+  bestSellerPromoMobile: {
+    width: '100%',
+    flexGrow: 0,
+    flexBasis: 'auto',
+    padding: spacing.lg,
   },
   promoHeadline: {
     fontFamily: typography.serif,
@@ -1423,6 +1677,14 @@ const styles = StyleSheet.create({
     minWidth: 280,
     gap: spacing.sm,
   },
+  bestSellerCarouselColMobile: {
+    flex: undefined,
+    flexGrow: 0,
+    flexShrink: 1,
+    flexBasis: 'auto',
+    minWidth: 0,
+    width: '100%',
+  },
   bestSellerNavRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1442,6 +1704,9 @@ const styles = StyleSheet.create({
   carouselItemCard: {
     width: 256,
   },
+  carouselItemCardMobile: {
+    width: 164,
+  },
   toolbarCard: {
     backgroundColor: colors.surface,
     borderWidth: 1,
@@ -1449,6 +1714,13 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
+    gap: spacing.sm,
+  },
+  toolbarCardMobile: {
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+    paddingHorizontal: 0,
+    paddingVertical: 2,
     gap: spacing.sm,
   },
   toolbarTop: {
@@ -1461,7 +1733,7 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'baseline',
-    gap: spacing.md,
+    gap: spacing.sm,
     flexWrap: 'wrap',
   },
   allProductsTitle: {
@@ -1469,6 +1741,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '800',
     color: colors.ink,
+  },
+  allProductsTitleMobile: {
+    fontFamily: typography.serif,
+    fontSize: 19,
+    fontWeight: '700',
+  },
+  mobileSortStrip: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+    paddingVertical: 2,
   },
   resultCount: {
     fontFamily: typography.sans,
@@ -1568,6 +1850,22 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '800',
     color: colors.amberInk,
+  },
+  mobileFilterFab: {
+    position: 'absolute',
+    right: 14,
+    bottom: 14,
+    backgroundColor: colors.accent,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 10,
+    borderRadius: radius.pill,
+    zIndex: 30,
+  },
+  mobileFilterFabText: {
+    fontFamily: typography.sans,
+    fontSize: 12.5,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
   sidebarBody: {
     gap: spacing.md,
@@ -1747,6 +2045,10 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: spacing.lg,
   },
+  gridMobile: {
+    gap: spacing.sm,
+    justifyContent: 'space-between',
+  },
   skeletonCard: {
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
@@ -1765,6 +2067,28 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     position: 'relative',
   },
+  cardWrapCompact: {
+    padding: 0,
+    gap: 0,
+    borderColor: '#EAECE9',
+    overflow: 'hidden',
+  },
+  touchQuickViewBtn: {
+    position: 'absolute',
+    right: 8,
+    bottom: 8,
+    width: 30,
+    height: 30,
+    borderRadius: 99,
+    backgroundColor: 'rgba(255,255,255,0.88)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 12,
+  },
+  touchQuickViewIcon: {
+    fontSize: 13,
+    color: colors.ink,
+  },
   cardArtContainer: {
     position: 'relative',
   },
@@ -1777,15 +2101,15 @@ const styles = StyleSheet.create({
   },
   cardBadge: {
     position: 'absolute',
-    top: 10,
-    left: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 3,
+    top: 8,
+    left: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
     borderRadius: radius.pill,
   },
   cardBadgeText: {
     fontFamily: typography.sans,
-    fontSize: 11,
+    fontSize: 10.5,
     fontWeight: '700',
   },
   freeshipPill: {
@@ -1796,6 +2120,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: radius.pill,
+  },
+  freeshipMiniTag: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    backgroundColor: 'rgba(14, 138, 68, 0.88)',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: radius.xs,
   },
   freeshipText: {
     fontFamily: typography.sans,
@@ -1838,12 +2171,24 @@ const styles = StyleSheet.create({
     gap: 5,
     paddingHorizontal: 2,
   },
+  cardBodyCompact: {
+    paddingHorizontal: 10,
+    paddingTop: 8,
+    paddingBottom: 10,
+    gap: 6,
+  },
   cardTitle: {
     fontFamily: typography.sans,
     fontSize: 14,
     fontWeight: '700',
     color: colors.ink,
     minHeight: 38,
+  },
+  cardTitleCompact: {
+    fontSize: 13,
+    fontWeight: '500',
+    lineHeight: 18,
+    minHeight: 36,
   },
   cardSubMetaRow: {
     flexDirection: 'row',
@@ -1878,6 +2223,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  swatchCircleOuterCompact: {
+    width: 15,
+    height: 15,
+    padding: 1.5,
+  },
   swatchCircleOuterActive: {
     borderColor: colors.accent,
     borderWidth: 2,
@@ -1905,6 +2255,35 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: colors.accent,
     fontVariant: ['tabular-nums'],
+  },
+  cardPriceCompact: {
+    fontSize: 15,
+  },
+  mobilePriceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 2,
+  },
+  mobilePlusAddBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 99,
+    backgroundColor: colors.accentSoft,
+    borderWidth: 1,
+    borderColor: '#BEE4CE',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mobilePlusAddDisabled: {
+    backgroundColor: colors.surfaceAlt,
+    borderColor: colors.border,
+  },
+  mobilePlusAddText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: colors.accent,
+    lineHeight: 16,
   },
   cardCtaBtn: {
     width: '100%',

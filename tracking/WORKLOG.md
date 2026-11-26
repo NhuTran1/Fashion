@@ -355,3 +355,24 @@
   - `npm run typecheck --workspace apps/mobile` & `npm run typecheck --workspace apps/api`: PASS (0 errors).
   - `EXPO_NO_TELEMETRY=1 HOME=/tmp npx expo export --platform web --output-dir /tmp/fashion-web-dist`: PASS (295 modules, 782KB).
   - Playwright Chromium E2E Smoke Test (`1440x900`, `http://127.0.0.1:4181`): PASS (`PLAYWRIGHT E2E WEB SMOKE TEST PASSED (0 errors)`).
+
+
+## 2026-11-26 — Kiểm tra & Tối ưu Toàn bộ Giao diện Mobile (Nhánh feat/frontend-expo-mock)
+- Scope:
+  - Thu gọn Header mobile (`< 768px`) về 1 hàng gọn với nút mở thanh tìm kiếm trượt mượt (`⌕ Tìm`), nút `Giỏ` có badge đếm, nút `QA` và bổ sung `Bottom Navigation Bar` 5 tab (`Trang chủ`, `Sản phẩm`, `Đơn hàng`/`Địa chỉ`, `Quản trị`, `Tài khoản`/`Hồ sơ`) kèm padding an toàn cho `StatusBar` Android ([AppShell.tsx](apps/mobile/src/components/AppShell.tsx)).
+  - Điều chỉnh bố cục mobile cho Trang chủ & Trang Sản phẩm ([CatalogScreen.tsx](apps/mobile/src/screens/customer/CatalogScreen.tsx)): lưới sản phẩm 2 cột cân đối (`width >= 340px`), nút `👁` Xem nhanh chạm tay trên thẻ mobile, sửa căn trái carousel danh mục tròn (`ALL`), sửa lỗi flex `Bán chạy nhất hàng ngày` (`flex: undefined, flexBasis: 'auto'`), thay tab mép phải giữa màn hình bằng nút nổi góc dưới `⚙ Bộ lọc` và animation drawer trượt mượt từ cạnh phải.
+  - Tinh chỉnh responsive cho [VoucherStrip.tsx](apps/mobile/src/components/VoucherStrip.tsx), [QuickViewModal.tsx](apps/mobile/src/components/QuickViewModal.tsx), [ProductDetailScreen.tsx](apps/mobile/src/screens/customer/ProductDetailScreen.tsx), [CartCheckoutScreens.tsx](apps/mobile/src/screens/customer/CartCheckoutScreens.tsx), [OrdersScreens.tsx](apps/mobile/src/screens/customer/OrdersScreens.tsx), [AuthScreen.tsx](apps/mobile/src/screens/customer/AuthScreen.tsx), [AdminWorkspaceScreen.tsx](apps/mobile/src/screens/admin/AdminWorkspaceScreen.tsx), [AdminCatalogPanel.tsx](apps/mobile/src/screens/admin/AdminCatalogPanel.tsx) và [AdminOperationsPanels.tsx](apps/mobile/src/screens/admin/AdminOperationsPanels.tsx).
+- Actual commands and results:
+  - `npm run typecheck --workspace apps/mobile` & `npm run typecheck --workspace apps/api`: PASS (0 errors).
+  - `EXPO_NO_TELEMETRY=1 HOME=/tmp npx expo export --platform web --output-dir /tmp/fashion-web-dist`: PASS (301 modules, 791KB).
+  - Playwright Chromium Verification (`390x844` touch mobile + `1440x900` desktop, `http://127.0.0.1:4183`): PASS (`MOBILE & DESKTOP VERIFICATION PASSED!`, `TOTAL ERRORS: 0`, `scrollWidth=390` trên tất cả màn hình mobile đã kiểm tra).
+
+## 2026-11-26 (Lần 2) — Mở thoáng Giao diện Mobile theo phong cách Shopee (Nhánh feat/frontend-expo-mock)
+- Scope:
+  - Chuyển Header mobile sang thanh tìm kiếm bo tròn nằm ngang trực tiếp bên cạnh logo ([AppShell.tsx](apps/mobile/src/components/AppShell.tsx)).
+  - Giảm lồng khung/viền dày trên thẻ sản phẩm mobile ([UiPrimitives.tsx](apps/mobile/src/components/UiPrimitives.tsx) với `frameless` / `sharpBottom`, [CatalogScreen.tsx](apps/mobile/src/screens/customer/CatalogScreen.tsx)): ảnh tràn viền trên, bỏ nút xanh toàn chiều rộng trên từng thẻ lưới 2 cột và thay bằng nút tròn `+` gọn cạnh giá bán.
+  - Bỏ hộp viền bao ngoài ở mục `Danh mục nổi bật` (chuyển sang icon bo góc thoáng), `Bán chạy nhất hàng ngày` trên mobile (header 1 dòng + carousel ngang trực tiếp trên nền), và bỏ nút nổi `⚙ Bộ lọc` che nội dung để dùng dải lọc/sắp xếp `Gợi ý hôm nay` (`Mới nhất`, `Giá tăng dần`, `Giá giảm dần`, `⚙ Bộ lọc`) ngay trên lưới; thu gọn kích thước thẻ [VoucherStrip.tsx](apps/mobile/src/components/VoucherStrip.tsx).
+- Actual commands and results:
+  - `npm run typecheck --workspace apps/mobile` & `npm run typecheck --workspace apps/api`: PASS (0 errors).
+  - `EXPO_NO_TELEMETRY=1 HOME=/tmp npx expo export --platform web --output-dir /tmp/fashion-web-dist`: PASS (295 modules, 794KB).
+  - Playwright Chromium Verification (`390x844` touch mobile + `1440x900` desktop, `http://127.0.0.1:4183`): PASS (`MOBILE & DESKTOP VERIFICATION PASSED!`, `TOTAL ERRORS: 0`, `scrollWidth=390` trên tất cả màn hình mobile đã kiểm tra).

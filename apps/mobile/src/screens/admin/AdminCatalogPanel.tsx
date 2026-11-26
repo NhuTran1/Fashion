@@ -282,7 +282,7 @@ export function AdminCatalogPanel(): React.ReactElement {
           <View style={styles.inlineForm}>
             <Text style={styles.subTitle}>Tạo danh mục mới</Text>
             <View style={styles.formRow}>
-              <View style={{ flex: 1 }}>
+              <View style={{ flex: 1, minWidth: 140 }}>
                 <FieldInput
                   label="Tên danh mục"
                   value={catName}
@@ -290,7 +290,7 @@ export function AdminCatalogPanel(): React.ReactElement {
                   placeholder="Áo kiểu Linen"
                 />
               </View>
-              <View style={{ flex: 1 }}>
+              <View style={{ flex: 1, minWidth: 140 }}>
                 <FieldInput
                   label="Slug"
                   value={catSlug}
@@ -475,13 +475,13 @@ export function AdminCatalogPanel(): React.ReactElement {
                   placeholder="SOI-NEW-BLK-M"
                 />
                 <View style={styles.formRow}>
-                  <View style={{ flex: 1 }}>
+                  <View style={{ flex: 1, minWidth: 100 }}>
                     <FieldInput label="Size" value={varSize} onChangeText={setVarSize} />
                   </View>
-                  <View style={{ flex: 1 }}>
+                  <View style={{ flex: 1, minWidth: 110 }}>
                     <FieldInput label="Màu" value={varColor} onChangeText={setVarColor} />
                   </View>
-                  <View style={{ flex: 1 }}>
+                  <View style={{ flex: 1, minWidth: 130 }}>
                     <FieldInput
                       label="Giá Decimal"
                       value={varPrice}
@@ -567,31 +567,33 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radius.lg,
-    padding: spacing.xl,
+    padding: spacing.lg,
     gap: spacing.md,
   },
-  panelTitle: { fontFamily: typography.serif, fontSize: 20, color: colors.ink },
+  panelTitle: { fontFamily: typography.serif, fontSize: 19, color: colors.ink },
   subTitle: { fontFamily: typography.sans, fontSize: 14, fontWeight: '700', color: colors.ink },
   rowWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, alignItems: 'center' },
   tagItem: {
+    maxWidth: '100%',
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     gap: spacing.xs,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.pill,
+    borderRadius: radius.md,
     backgroundColor: colors.surfaceSoft,
     paddingHorizontal: spacing.md,
-    paddingVertical: 5,
+    paddingVertical: 6,
   },
-  tagText: { fontFamily: typography.sans, fontSize: 12, color: colors.ink },
+  tagText: { flexShrink: 1, fontFamily: typography.sans, fontSize: 12, color: colors.ink },
   inlineForm: {
     borderTopWidth: 1,
     borderTopColor: colors.border,
     paddingTop: spacing.md,
     gap: spacing.sm,
   },
-  formRow: { flexDirection: 'row', gap: spacing.sm },
+  formRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   listStack: { gap: spacing.sm },
   productRow: {
     borderWidth: 1,
@@ -603,6 +605,7 @@ const styles = StyleSheet.create({
   productRowActive: { borderColor: colors.accent, backgroundColor: colors.accentSoft },
   rowInner: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     gap: spacing.sm,
   },
@@ -621,6 +624,7 @@ const styles = StyleSheet.create({
   divider: { height: 1, backgroundColor: colors.border, marginVertical: spacing.xs },
   variantRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     gap: spacing.sm,
     borderWidth: 1,

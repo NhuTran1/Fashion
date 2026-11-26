@@ -87,42 +87,82 @@ export function AdminWorkspaceScreen({
 
   return (
     <View style={[styles.shell, isWide && styles.shellWide]}>
-      {/* Soft elevated left rail on wide screens / pill tabs on compact screens */}
+      {/* Soft elevated left rail on wide screens / sleek horizontal rail on compact mobile */}
       <View style={[styles.rail, shadows.card, isWide && styles.railWide]}>
-        <View style={styles.railHeader}>
-          <Text style={styles.railTitle}>Quản trị cửa hàng</Text>
-          <StatusBadge
-            label={user.role === 'ADMIN' ? 'ADMIN · MVP A' : 'STAFF · MVP B'}
-            tone={user.role === 'ADMIN' ? 'accent' : 'warning'}
+        <View style={[styles.railHeader, !isWide && styles.railHeaderCompact]}>
+          <View style={styles.railTitleGroup}>
+            <Text style={[styles.railTitle, !isWide && styles.railTitleCompact]}>
+              Quản trị cửa hàng
+            </Text>
+            <StatusBadge
+              label={user.role === 'ADMIN' ? 'ADMIN · MVP A' : 'STAFF · MVP B'}
+              tone={user.role === 'ADMIN' ? 'accent' : 'warning'}
+            />
+          </View>
+          {!isWide ? (
+            <EditorialButton
+              label="Cửa hàng"
+              variant="secondary"
+              compact
+              onPress={() => navigate({ name: 'catalog' })}
+            />
+          ) : null}
+        </View>
+        {isWide ? (
+          <View style={styles.tabCol}>
+            {tabs.map((t) => {
+              const active = activeTab === t.id;
+              return (
+                <Pressable
+                  key={t.id}
+                  onPress={() => setActiveTab(t.id)}
+                  style={[
+                    styles.navItem,
+                    active && styles.navItemActive,
+                    !t.allowed && { opacity: 0.65 },
+                  ]}
+                >
+                  <Text style={[styles.navText, active && styles.navTextActive]}>
+                    {t.label}
+                    {!t.allowed ? ' (403)' : ''}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        ) : (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <View style={styles.tabRow}>
+              {tabs.map((t) => {
+                const active = activeTab === t.id;
+                return (
+                  <Pressable
+                    key={t.id}
+                    onPress={() => setActiveTab(t.id)}
+                    style={[
+                      styles.navItem,
+                      active && styles.navItemActive,
+                      !t.allowed && { opacity: 0.65 },
+                    ]}
+                  >
+                    <Text style={[styles.navText, active && styles.navTextActive]}>
+                      {t.label}
+                      {!t.allowed ? ' (403)' : ''}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </ScrollView>
+        )}
+        {isWide ? (
+          <EditorialButton
+            label="Xem góc nhìn Customer"
+            variant="secondary"
+            compact
+            onPress={() => navigate({ name: 'catalog' })}
           />
-        </View>
-        <View style={isWide ? styles.tabCol : styles.tabRow}>
-          {tabs.map((t) => {
-            const active = activeTab === t.id;
-            return (
-              <Pressable
-                key={t.id}
-                onPress={() => setActiveTab(t.id)}
-                style={[
-                  styles.navItem,
-                  active && styles.navItemActive,
-                  !t.allowed && { opacity: 0.65 },
-                ]}
-              >
-                <Text style={[styles.navText, active && styles.navTextActive]}>
-                  {t.label}
-                  {!t.allowed ? ' (403)' : ''}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-        <EditorialButton
-          label="Xem góc nhìn Customer"
-          variant="secondary"
-          compact
-          onPress={() => navigate({ name: 'catalog' })}
-        />
+        ) : null}
       </View>
 
       <ScrollView style={styles.main} contentContainerStyle={styles.mainContent}>
@@ -172,12 +212,24 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
   },
   railHeader: { gap: spacing.xs },
+  railHeaderCompact: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+  },
+  railTitleGroup: {
+    gap: 4,
+    flexShrink: 1,
+    alignItems: 'flex-start',
+  },
   railTitle: { fontFamily: typography.serif, fontSize: 19, color: colors.ink },
+  railTitleCompact: { fontSize: 17 },
   tabCol: { gap: spacing.xs },
-  tabRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
+  tabRow: { flexDirection: 'row', gap: spacing.xs },
   navItem: {
     paddingHorizontal: spacing.md,
-    paddingVertical: 10,
+    paddingVertical: 8,
     borderRadius: radius.pill,
     borderWidth: 1,
     borderColor: colors.border,

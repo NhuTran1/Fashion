@@ -1,5 +1,13 @@
 import React, { useRef, useState } from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import { useApp } from '../state/AppContext';
 import { colors, radius, shadows, spacing, typography } from '../theme/tokens';
 
@@ -56,8 +64,12 @@ export const DEMO_VOUCHERS: DemoVoucher[] = [
 /** Horizontal row of Sudes-inspired notched voucher ticket cards with left/right carousel arrows. */
 export function VoucherStrip(): React.ReactElement {
   const { showToast } = useApp();
+  const { width } = useWindowDimensions();
   const scrollRef = useRef<React.ComponentRef<typeof ScrollView>>(null);
   const scrollXRef = useRef<number>(0);
+
+  const isCompact = width < 768;
+  const ticketWidth = isCompact ? Math.min(252, Math.max(228, width - 84)) : 316;
 
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [activeInfoCode, setActiveInfoCode] = useState<string | null>(null);
@@ -124,13 +136,29 @@ export function VoucherStrip(): React.ReactElement {
             const showInfo = activeInfoCode === v.code;
 
             return (
-              <View key={v.code} style={[styles.ticketCard, shadows.soft]}>
-                <View style={styles.notchTop} />
-                <View style={styles.notchBottom} />
+              <View
+                key={v.code}
+                style={[
+                  styles.ticketCard,
+                  isCompact && styles.ticketCardCompact,
+                  shadows.soft,
+                  { width: ticketWidth },
+                ]}
+              >
+                <View style={[styles.notchTop, isCompact && styles.notchCompact]} />
+                <View style={[styles.notchBottom, isCompact && styles.notchCompact]} />
 
-                <View style={[styles.stub, { backgroundColor: v.stubColor }]}>
+                <View
+                  style={[
+                    styles.stub,
+                    isCompact && styles.stubCompact,
+                    { backgroundColor: v.stubColor },
+                  ]}
+                >
                   <Text style={styles.stubTop}>{v.stubTop}</Text>
-                  <Text style={styles.stubValue}>{v.stubValue}</Text>
+                  <Text style={[styles.stubValue, isCompact && styles.stubValueCompact]}>
+                    {v.stubValue}
+                  </Text>
                 </View>
 
                 <View style={styles.dashedDivider} />
@@ -184,17 +212,17 @@ const styles = StyleSheet.create({
   },
   headerRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     justifyContent: 'space-between',
     alignItems: 'center',
     gap: spacing.sm,
   },
   titleBlock: {
+    flex: 1,
     gap: 2,
   },
   sectionTitle: {
     fontFamily: typography.serif,
-    fontSize: 19,
+    fontSize: 18,
     fontWeight: '700',
     color: colors.ink,
   },
@@ -234,12 +262,16 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderRadius: radius.sm,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: '#ECEEEB',
     flexDirection: 'row',
     alignItems: 'stretch',
     padding: spacing.sm,
     position: 'relative',
     overflow: 'hidden',
+  },
+  ticketCardCompact: {
+    minHeight: 88,
+    padding: 6,
   },
   notchTop: {
     position: 'absolute',
@@ -265,6 +297,9 @@ const styles = StyleSheet.create({
     left: 91,
     zIndex: 4,
   },
+  notchCompact: {
+    left: 70,
+  },
   stub: {
     width: 82,
     borderRadius: radius.xs,
@@ -272,6 +307,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 6,
     gap: 2,
+  },
+  stubCompact: {
+    width: 64,
+    paddingHorizontal: 4,
   },
   stubTop: {
     fontFamily: typography.sans,
@@ -284,6 +323,9 @@ const styles = StyleSheet.create({
     fontSize: 19,
     fontWeight: '800',
     color: '#FFFFFF',
+  },
+  stubValueCompact: {
+    fontSize: 15,
   },
   dashedDivider: {
     width: 1,

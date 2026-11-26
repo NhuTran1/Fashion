@@ -4,6 +4,7 @@ import {
   Platform,
   Pressable,
   SafeAreaView,
+  StatusBar,
   StyleSheet,
   Text,
   TextInput,
@@ -67,6 +68,8 @@ export function AppShell(): React.ReactElement {
 
   const cartCount = cart.items.reduce((sum, item) => sum + item.quantity, 0);
   const isWide = width >= 920;
+  const isCompactMobile = width < 768;
+  const canUseCart = !user || user.role === 'CUSTOMER';
 
   // Pop animation whenever cart item count changes.
   const cartScale = useRef(new Animated.Value(1)).current;
@@ -107,32 +110,63 @@ export function AppShell(): React.ReactElement {
           : route.name;
 
   return (
-    <SafeAreaView style={styles.root}>
-      {/* Two-Tier Bean Farm Inspired E-Commerce Header */}
+    <SafeAreaView
+      style={[
+        styles.root,
+        Platform.OS === 'android' ? { paddingTop: StatusBar.currentHeight ?? 0 } : null,
+      ]}
+    >
+      {/* Responsive Header: Compact 1-tier on mobile + Full two-tier Bean Farm header on desktop */}
       <View style={[styles.header, shadows.soft]}>
-        {/* Tier 1: Brand mark + Search input + Utility action pills */}
-        <View style={styles.tierOne}>
+        <View style={[styles.tierOne, isCompactMobile && styles.tierOneMobile]}>
           <Pressable
             onPress={() => {
               setHeaderQuery('');
               setCatalogSearchTrigger({ q: '', nonce: Date.now() });
-              navigate({ name: 'catalog' });
+              navigate({ name: 'catalog', view: 'home' });
             }}
             style={styles.brandBtn}
           >
-            <View style={styles.brandLogoMark}>
+            <View style={[styles.brandLogoMark, isCompactMobile && styles.brandLogoMarkMobile]}>
               <View style={styles.brandLogoLeaf} />
             </View>
-            <View>
-              <Text style={styles.brandWordmark}>
-                <Text style={{ color: colors.accent }}>SỞI </Text>
-                <Text style={{ color: colors.amber }}>Fashion</Text>
-              </Text>
-              <Text style={styles.brandTagline}>Chất lượng - Tự nhiên</Text>
-            </View>
+            {!isCompactMobile ? (
+              <View>
+                <Text style={styles.brandWordmark}>
+                  <Text style={{ color: colors.accent }}>SỞI </Text>
+                  <Text style={{ color: colors.amber }}>Fashion</Text>
+                </Text>
+                <Text style={styles.brandTagline}>Chất lượng - Tự nhiên</Text>
+              </View>
+            ) : null}
           </Pressable>
 
-          {isWide ? (
+          {isCompactMobile ? (
+            <View style={styles.mobileInlineSearch}>
+              <Text style={styles.mobileSearchPrefix}>⌕</Text>
+              <TextInput
+                value={headerQuery}
+                onChangeText={setHeaderQuery}
+                onSubmitEditing={handleHeaderSearch}
+                placeholder="Tìm áo, quần, blazer..."
+                placeholderTextColor={colors.muted}
+                style={styles.mobileSearchField}
+                returnKeyType="search"
+                accessibilityLabel="Tìm kiếm sản phẩm"
+              />
+              {headerQuery ? (
+                <Pressable
+                  onPress={() => {
+                    setHeaderQuery('');
+                    setCatalogSearchTrigger({ q: '', nonce: Date.now() });
+                  }}
+                  style={styles.mobileSearchClear}
+                >
+                  <Text style={styles.mobileSearchClearText}>✕</Text>
+                </Pressable>
+              ) : null}
+            </View>
+          ) : isWide ? (
             <View style={styles.headerSearchBox}>
               <TextInput
                 value={headerQuery}
@@ -150,35 +184,41 @@ export function AppShell(): React.ReactElement {
           ) : null}
 
           <View style={styles.utilityRow}>
-            {user?.role === 'CUSTOMER' ? (
-              <UtilityPill
-                label="Đơn hàng"
-                active={route.name === 'orders' || route.name === 'order-detail'}
-                onPress={() => navigate({ name: 'orders' })}
-              />
+            {!isCompactMobile ? (
+              <>
+                {user?.role === 'CUSTOMER' ? (
+                  <UtilityPill
+                    label="Đơn hàng"
+                    active={route.name === 'orders' || route.name === 'order-detail'}
+                    onPress={() => navigate({ name: 'orders' })}
+                  />
+                ) : null}
+
+                <UtilityPill
+                  label={user ? user.email.split('@')[0] : 'Tài khoản'}
+                  active={
+                    route.name === 'auth' || route.name === 'profile' || route.name === 'addresses'
+                  }
+                  onPress={() =>
+                    user ? navigate({ name: 'profile' }) : navigate({ name: 'auth', mode: 'login' })
+                  }
+                />
+              </>
             ) : null}
 
-            <UtilityPill
-              label={user ? user.email.split('@')[0] : 'Tài khoản'}
-              active={
-                route.name === 'auth' || route.name === 'profile' || route.name === 'addresses'
-              }
-              onPress={() =>
-                user ? navigate({ name: 'profile' }) : navigate({ name: 'auth', mode: 'login' })
-              }
-            />
-
-            {!user || user.role === 'CUSTOMER' ? (
+            {canUseCart ? (
               <Animated.View style={{ transform: [{ scale: cartScale }] }}>
                 <Pressable
                   onPress={() => navigate({ name: 'cart' })}
                   style={[
                     styles.cartUtilityPill,
+                    isCompactMobile && styles.cartUtilityPillMobile,
                     (route.name === 'cart' || route.name === 'checkout') &&
                       styles.utilityPillActive,
                   ]}
+                  accessibilityLabel="Giỏ hàng"
                 >
-                  <Text style={styles.utilityText}>Giỏ hàng</Text>
+                  <Text style={styles.utilityText}>{isCompactMobile ? '🛍' : 'Giỏ hàng'}</Text>
                   <View style={styles.cartCountBadge}>
                     <Text style={styles.cartCountText}>{cartCount}</Text>
                   </View>
@@ -189,73 +229,79 @@ export function AppShell(): React.ReactElement {
             {fashionApi.isMockMode() ? (
               <Pressable
                 onPress={() => setShowQaBar((v) => !v)}
-                style={[styles.qaToggle, nextFault !== 'NONE' && styles.qaToggleArmed]}
+                style={[
+                  styles.qaToggle,
+                  isCompactMobile && styles.qaToggleMobile,
+                  nextFault !== 'NONE' && styles.qaToggleArmed,
+                ]}
               >
                 <Text style={styles.qaToggleText}>
-                  {nextFault !== 'NONE' ? `QA: ${nextFault}` : 'QA Sim'}
+                  {nextFault !== 'NONE' ? 'QA!' : isCompactMobile ? 'QA' : 'QA Sim'}
                 </Text>
               </Pressable>
             ) : null}
           </View>
         </View>
 
-        {/* Tier 2: Amber Category Pill + Navigation Pills + Coral Quick-Buy CTA */}
-        <View style={styles.tierTwo}>
-          <Pressable
-            onPress={() => navigate({ name: 'catalog', view: 'products' })}
-            style={styles.amberCategoryBtn}
-            accessibilityRole="button"
-          >
-            <Text style={styles.amberCategoryText}>☰ Danh mục sản phẩm</Text>
-          </Pressable>
-
-          <View style={styles.navActions}>
-            <NavTab
-              label="Trang chủ"
-              active={route.name === 'catalog' && (route.view ?? 'home') === 'home'}
-              onPress={() => navigate({ name: 'catalog', view: 'home' })}
-            />
-            <NavTab
-              label="Sản phẩm"
-              active={
-                (route.name === 'catalog' && route.view === 'products') ||
-                route.name === 'product'
-              }
+        {/* Tier 2 Desktop/Tablet Bar: Amber Category Pill + Nav Pills + Coral Quick-Buy CTA */}
+        {!isCompactMobile ? (
+          <View style={styles.tierTwo}>
+            <Pressable
               onPress={() => navigate({ name: 'catalog', view: 'products' })}
-            />
-            {user?.role === 'CUSTOMER' ? (
-              <NavTab
-                label="Địa chỉ"
-                active={route.name === 'addresses'}
-                onPress={() => navigate({ name: 'addresses' })}
-              />
-            ) : null}
-            <NavTab
-              label="Quản trị"
-              active={route.name === 'admin'}
-              onPress={() => navigate({ name: 'admin', tab: 'orders' })}
-            />
-            {!user ? (
-              <NavTab
-                label="Đăng nhập"
-                active={route.name === 'auth'}
-                onPress={() => navigate({ name: 'auth', mode: 'login' })}
-              />
-            ) : null}
-          </View>
+              style={styles.amberCategoryBtn}
+              accessibilityRole="button"
+            >
+              <Text style={styles.amberCategoryText}>☰ Danh mục sản phẩm</Text>
+            </Pressable>
 
-          <Pressable
-            onPress={() =>
-              user?.role === 'CUSTOMER'
-                ? navigate({ name: cartCount > 0 ? 'checkout' : 'catalog' })
-                : navigate({ name: 'auth', mode: 'login' })
-            }
-            style={styles.quickOrderBtn}
-            accessibilityRole="button"
-          >
-            <Text style={styles.quickOrderText}>Mua hàng nhanh</Text>
-          </Pressable>
-        </View>
+            <View style={styles.navActions}>
+              <NavTab
+                label="Trang chủ"
+                active={route.name === 'catalog' && (route.view ?? 'home') === 'home'}
+                onPress={() => navigate({ name: 'catalog', view: 'home' })}
+              />
+              <NavTab
+                label="Sản phẩm"
+                active={
+                  (route.name === 'catalog' && route.view === 'products') ||
+                  route.name === 'product'
+                }
+                onPress={() => navigate({ name: 'catalog', view: 'products' })}
+              />
+              {user?.role === 'CUSTOMER' ? (
+                <NavTab
+                  label="Địa chỉ"
+                  active={route.name === 'addresses'}
+                  onPress={() => navigate({ name: 'addresses' })}
+                />
+              ) : null}
+              <NavTab
+                label="Quản trị"
+                active={route.name === 'admin'}
+                onPress={() => navigate({ name: 'admin', tab: 'orders' })}
+              />
+              {!user ? (
+                <NavTab
+                  label="Đăng nhập"
+                  active={route.name === 'auth'}
+                  onPress={() => navigate({ name: 'auth', mode: 'login' })}
+                />
+              ) : null}
+            </View>
+
+            <Pressable
+              onPress={() =>
+                user?.role === 'CUSTOMER'
+                  ? navigate({ name: cartCount > 0 ? 'checkout' : 'catalog' })
+                  : navigate({ name: 'auth', mode: 'login' })
+              }
+              style={styles.quickOrderBtn}
+              accessibilityRole="button"
+            >
+              <Text style={styles.quickOrderText}>Mua hàng nhanh</Text>
+            </Pressable>
+          </View>
+        ) : null}
 
         {/* Collapsible Mock Fault Simulator */}
         {showQaBar && fashionApi.isMockMode() ? (
@@ -338,7 +384,87 @@ export function AppShell(): React.ReactElement {
         {route.name === 'order-detail' ? <OrderDetailScreen orderId={route.orderId} /> : null}
         {route.name === 'admin' ? <AdminWorkspaceScreen initialTab={route.tab} /> : null}
       </FadeSlideIn>
+
+      {/* Thumb-friendly Bottom Navigation Bar on Mobile */}
+      {isCompactMobile ? (
+        <View style={[styles.mobileTabBar, shadows.card]}>
+          <MobileBottomTab
+            glyph="⌂"
+            label="Trang chủ"
+            active={route.name === 'catalog' && (route.view ?? 'home') === 'home'}
+            onPress={() => navigate({ name: 'catalog', view: 'home' })}
+          />
+          <MobileBottomTab
+            glyph="▤"
+            label="Sản phẩm"
+            active={
+              (route.name === 'catalog' && route.view === 'products') || route.name === 'product'
+            }
+            onPress={() => navigate({ name: 'catalog', view: 'products' })}
+          />
+          <MobileBottomTab
+            glyph="☰"
+            label={!user || user.role === 'CUSTOMER' ? 'Đơn hàng' : 'Địa chỉ'}
+            active={
+              route.name === 'orders' ||
+              route.name === 'order-detail' ||
+              route.name === 'addresses'
+            }
+            onPress={() =>
+              user
+                ? navigate({ name: user.role === 'CUSTOMER' ? 'orders' : 'admin', tab: 'orders' })
+                : navigate({ name: 'orders' })
+            }
+          />
+          <MobileBottomTab
+            glyph="⚙"
+            label="Quản trị"
+            active={route.name === 'admin'}
+            onPress={() => navigate({ name: 'admin', tab: 'orders' })}
+          />
+          <MobileBottomTab
+            glyph="☺"
+            label={user ? 'Hồ sơ' : 'Tài khoản'}
+            active={
+              route.name === 'auth' || route.name === 'profile' || route.name === 'addresses'
+            }
+            onPress={() =>
+              user ? navigate({ name: 'profile' }) : navigate({ name: 'auth', mode: 'login' })
+            }
+          />
+        </View>
+      ) : null}
     </SafeAreaView>
+  );
+}
+
+/** Compact bottom navigation tab for mobile viewports with subtle active emerald tint. */
+function MobileBottomTab({
+  glyph,
+  label,
+  active,
+  onPress,
+}: {
+  glyph: string;
+  label: string;
+  active: boolean;
+  onPress: () => void;
+}): React.ReactElement {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={[styles.mobileTabBtn, active && styles.mobileTabBtnActive]}
+      accessibilityRole="tab"
+      accessibilityLabel={label}
+    >
+      <Text style={[styles.mobileTabGlyph, active && styles.mobileTabTextActive]}>{glyph}</Text>
+      <Text
+        style={[styles.mobileTabLabel, active && styles.mobileTabTextActive]}
+        numberOfLines={1}
+      >
+        {label}
+      </Text>
+    </Pressable>
   );
 }
 
@@ -412,10 +538,17 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: spacing.md,
   },
+  tierOneMobile: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    flexWrap: 'nowrap',
+    gap: spacing.sm,
+  },
   brandBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
+    flexShrink: 1,
   },
   brandLogoMark: {
     width: 34,
@@ -426,6 +559,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.surface,
+  },
+  brandLogoMarkMobile: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    borderWidth: 2.5,
   },
   brandLogoLeaf: {
     width: 14,
@@ -439,6 +578,56 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '800',
     letterSpacing: 0.3,
+  },
+  brandWordmarkMobile: {
+    fontSize: 17,
+  },
+  mobileInlineSearch: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F2F4F2',
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.sm,
+    height: 36,
+    gap: 6,
+  },
+  mobileSearchPrefix: {
+    fontSize: 13,
+    color: colors.muted,
+    fontWeight: '700',
+  },
+  mobileSearchField: {
+    flex: 1,
+    fontFamily: typography.sans,
+    fontSize: 13,
+    color: colors.ink,
+    paddingVertical: 0,
+  },
+  mobileSearchClear: {
+    width: 20,
+    height: 20,
+    borderRadius: 99,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#E1E5E2',
+  },
+  mobileSearchClearText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: colors.ink,
+  },
+  cartUtilityPillMobile: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 5,
+    gap: 5,
+    borderColor: '#E5E8E5',
+    backgroundColor: '#F8FAF8',
+  },
+  qaToggleMobile: {
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderColor: '#E5E8E5',
   },
   brandTagline: {
     fontFamily: typography.sans,
@@ -677,5 +866,45 @@ const styles = StyleSheet.create({
   },
   body: {
     flex: 1,
+  },
+  mobileTabBar: {
+    flexDirection: 'row',
+    backgroundColor: colors.surfaceGlass,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    paddingHorizontal: spacing.xs,
+    paddingTop: 6,
+    paddingBottom: Platform.OS === 'ios' ? 6 : 8,
+    gap: 2,
+    ...(Platform.OS === 'web'
+      ? ({ backdropFilter: 'blur(16px)' } as unknown as ViewStyle)
+      : {}),
+  },
+  mobileTabBtn: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 5,
+    paddingHorizontal: 4,
+    borderRadius: radius.sm,
+    gap: 1,
+  },
+  mobileTabBtnActive: {
+    backgroundColor: colors.accentSoft,
+  },
+  mobileTabGlyph: {
+    fontSize: 15,
+    color: colors.muted,
+    lineHeight: 18,
+  },
+  mobileTabLabel: {
+    fontFamily: typography.sans,
+    fontSize: 10,
+    fontWeight: '600',
+    color: colors.muted,
+  },
+  mobileTabTextActive: {
+    color: colors.accent,
+    fontWeight: '800',
   },
 });

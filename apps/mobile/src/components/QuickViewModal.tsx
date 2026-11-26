@@ -1,5 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import { fashionApi } from '../api/client';
 import { useApp } from '../state/AppContext';
 import {
@@ -30,6 +38,8 @@ export function QuickViewModal({
   onStockChanged: () => void;
 }): React.ReactElement | null {
   const { user, navigate, refreshCart, handleApiError, showToast } = useApp();
+  const { width } = useWindowDimensions();
+  const isCompact = width < 640;
 
   const [selectedSize, setSelectedSize] = useState('');
   const [selectedColor, setSelectedColor] = useState('');
@@ -108,9 +118,13 @@ export function QuickViewModal({
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
-      <View style={styles.overlay}>
+      <View style={[styles.overlay, isCompact && styles.overlayMobile]}>
         <Pressable style={styles.backdrop} onPress={onClose} />
-        <FadeSlideIn distance={16} duration={240} style={[styles.dialog, shadows.lifted]}>
+        <FadeSlideIn
+          distance={16}
+          duration={240}
+          style={[styles.dialog, isCompact && styles.dialogMobile, shadows.lifted]}
+        >
           <View style={styles.topBar}>
             <Text style={styles.dialogTitle}>Xem nhanh sản phẩm</Text>
             <Pressable onPress={onClose} style={styles.closeBtn}>
@@ -119,19 +133,20 @@ export function QuickViewModal({
           </View>
 
           <ScrollView showsVerticalScrollIndicator={false}>
-            <View style={styles.contentRow}>
-              <View style={styles.artCol}>
+            <View style={[styles.contentRow, isCompact && styles.contentRowMobile]}>
+              <View style={[styles.artCol, isCompact && styles.artColMobile]}>
                 <GarmentArtwork
                   uri={product.images[0]?.url}
                   altText={product.name}
-                  aspectRatio={3 / 4}
+                  aspectRatio={isCompact ? undefined : 3 / 4}
+                  height={isCompact ? 200 : undefined}
                   overrideToneHex={
                     selectedColor ? resolveColorSwatch(selectedColor) : undefined
                   }
                 />
               </View>
 
-              <View style={styles.infoCol}>
+              <View style={[styles.infoCol, isCompact && styles.infoColMobile]}>
                 <Text style={styles.prodName}>{product.name}</Text>
                 <View style={styles.priceRow}>
                   <Text style={styles.price}>
@@ -249,6 +264,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: spacing.lg,
   },
+  overlayMobile: {
+    padding: spacing.sm,
+  },
   backdrop: {
     position: 'absolute',
     top: 0,
@@ -267,6 +285,11 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     padding: spacing.xl,
     gap: spacing.md,
+  },
+  dialogMobile: {
+    maxHeight: '92%',
+    padding: spacing.lg,
+    gap: spacing.sm,
   },
   topBar: {
     flexDirection: 'row',
@@ -299,14 +322,29 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: spacing.xl,
   },
+  contentRowMobile: {
+    flexDirection: 'column',
+    gap: spacing.md,
+  },
   artCol: {
     width: 240,
     flexGrow: 1,
+  },
+  artColMobile: {
+    width: '100%',
+    flexGrow: 0,
   },
   infoCol: {
     flex: 1.4,
     minWidth: 250,
     gap: spacing.sm,
+  },
+  infoColMobile: {
+    flex: undefined,
+    flexGrow: 0,
+    flexBasis: 'auto',
+    minWidth: 0,
+    width: '100%',
   },
   prodName: {
     fontFamily: typography.serif,
